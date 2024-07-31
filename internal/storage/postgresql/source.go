@@ -20,7 +20,7 @@ func (pg *PostgreSQL) GetSources(ctx context.Context) ([]types.Source, error) {
 
 	for rows.Next() {
 		var source types.Source
-		err = rows.Scan(&source.ID, &source.Name, &source.Hostname, &source.CreatedAt, &source.UpdatedAt, &source.DeletedAt)
+		err = rows.Scan(&source.ID, &source.Name, &source.Url, &source.CreatedAt, &source.UpdatedAt, &source.DeletedAt)
 		if err != nil {
 			return nil, err
 		}

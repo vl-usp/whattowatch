@@ -8,7 +8,7 @@ import (
 type Source struct {
 	ID        int
 	Name      string
-	Hostname  string
+	Url       string
 	CreatedAt time.Time
 	UpdatedAt sql.NullTime
 	DeletedAt sql.NullTime

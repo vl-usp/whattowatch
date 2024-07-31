@@ -13,7 +13,7 @@ type Config struct {
 	LogDir      string
 	DB          DBConfig
 	ParseUrls   ParseUrls
-	Token       string
+	Tokens      Tokens
 }
 
 // MustLoad load configuration.
@@ -29,7 +29,7 @@ func MustLoad() *Config {
 		LogDir:      os.Getenv("LOG_DIR"),
 		DB:          NewDBConfig(),
 		ParseUrls:   NewParseUrls(),
-		Token:       os.Getenv("TOKEN"),
+		Tokens:      NewTokens(),
 	}
 
 	return cfg
