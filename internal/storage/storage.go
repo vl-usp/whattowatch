@@ -10,9 +10,13 @@ import (
 )
 
 type IStorage interface {
-	InsertSourceLinks(ctx context.Context, links types.SourceLinkMap) error
 	GetSources(ctx context.Context) ([]types.Source, error)
 	GetSourceByName(ctx context.Context, name string) (*types.Source, error)
+	InsertTMDbMovies(ctx context.Context, movies []types.TMDbMovie) error
+	InsertTMDbGenre(ctx context.Context, genre types.TMDbGenre) error
+	InsertTMDbMovieGenre(ctx context.Context, genreID, movieID int) error
+	GetTMDbMovieIDs(ctx context.Context) ([]int, error)
+	UpdateTMDbMovie(ctx context.Context, movie types.TMDbMovie) error
 }
 
 func New(cfg *config.Config, log *slog.Logger) (IStorage, error) {

@@ -4,11 +4,11 @@ NAME=default
 MIGRATION_DIR=$(CURDIR)/migration
 
 build:
-	go build -o $(LOCAL_BIN)/parser cmd/parser/main.go
+	go build -o $(LOCAL_BIN)/loader cmd/loader/main.go
 	go build -o $(LOCAL_BIN)/bot cmd/bot/main.go
 
-parse: build
-	$(LOCAL_BIN)/parser
+load: build
+	$(LOCAL_BIN)/loader
 
 install-deps:
 	GOBIN=$(LOCAL_BIN) go install github.com/pressly/goose/v3/cmd/goose@v3.20.0

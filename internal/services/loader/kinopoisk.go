@@ -1,6 +1,7 @@
 package loader
 
 import (
+	"context"
 	"log/slog"
 	"net/url"
 	"whattowatch/internal/storage"
@@ -28,6 +29,6 @@ func NewKinopoiskLoader(apiKey string, baseUrl string, log *slog.Logger, storage
 	}, nil
 }
 
-func (p *KinopoiskLoader) Load() error {
+func (p *KinopoiskLoader) Load(ctx context.Context) error {
 	return nil
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"whattowatch/internal/config"
 	"whattowatch/internal/services/loader"
 	"whattowatch/internal/storage"
@@ -15,13 +16,18 @@ func main() {
 
 	storage, err := storage.New(cfg, log)
 	if err != nil {
-		log.Error(err.Error())
+		log.Error("creating a storage error", "error", err.Error())
 	}
 
 	loader, err := loader.New("TMDb", cfg, log, storage)
 	if err != nil {
-		log.Error(err.Error())
+		log.Error("creating a loader error", "error", err.Error())
 	}
 
-	loader.Load()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	err = loader.Load(ctx)
+	if err != nil {
+		log.Error("load error", "error", err.Error())
+	}
 }

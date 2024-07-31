@@ -1,7 +1,6 @@
 package types
 
-type Source struct {
+type TMDbGenre struct {
 	ID   int
 	Name string
-	Url  string
 }

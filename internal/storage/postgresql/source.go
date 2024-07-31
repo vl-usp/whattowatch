@@ -2,6 +2,7 @@ package postgresql
 
 import (
 	"context"
+	"fmt"
 	"whattowatch/internal/types"
 
 	sq "github.com/Masterminds/squirrel"
@@ -20,7 +21,7 @@ func (pg *PostgreSQL) GetSources(ctx context.Context) ([]types.Source, error) {
 
 	for rows.Next() {
 		var source types.Source
-		err = rows.Scan(&source.ID, &source.Name, &source.Url, &source.CreatedAt, &source.UpdatedAt, &source.DeletedAt)
+		err = rows.Scan(&source.ID, &source.Name, &source.Url)
 		if err != nil {
 			return nil, err
 		}
@@ -30,14 +31,15 @@ func (pg *PostgreSQL) GetSources(ctx context.Context) ([]types.Source, error) {
 }
 
 func (pg *PostgreSQL) GetSourceByName(ctx context.Context, name string) (*types.Source, error) {
-	sql, args, err := sq.Select("*").PlaceholderFormat(sq.Dollar).From("sources").Where(sq.Eq{"name": name}).ToSql()
+	sql, args, err := sq.Select("id", "url").PlaceholderFormat(sq.Dollar).From("sources").Where(sq.Eq{"name": name}).ToSql()
 	if err != nil {
 		return nil, err
 	}
-	var source *types.Source
-	err = pg.pool.QueryRow(ctx, sql, args...).Scan(&source)
+	var id *int
+	var url *string
+	err = pg.pool.QueryRow(ctx, sql, args...).Scan(&id, &url)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get source: %s", err.Error())
 	}
-	return source, nil
+	return &types.Source{ID: *id, Name: name, Url: *url}, nil
 }

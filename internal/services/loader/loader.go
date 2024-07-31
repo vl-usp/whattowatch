@@ -10,7 +10,7 @@ import (
 )
 
 type ILoader interface {
-	Load() error
+	Load(ctx context.Context) error
 }
 
 type Loader struct {
