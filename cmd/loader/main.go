@@ -14,12 +14,12 @@ func main() {
 	log, file := logger.SetupLogger(cfg.Env, cfg.LogDir)
 	defer file.Close()
 
-	storage, err := storage.New(cfg, log)
+	storer, err := storage.New(cfg, log)
 	if err != nil {
 		log.Error("creating a storage error", "error", err.Error())
 	}
 
-	loader, err := loader.New("TMDb", cfg, log, storage)
+	loader, err := loader.New("TMDb", cfg, log, storer)
 	if err != nil {
 		log.Error("creating a loader error", "error", err.Error())
 	}

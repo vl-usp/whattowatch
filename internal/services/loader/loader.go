@@ -17,10 +17,10 @@ type Loader struct {
 	ID      int
 	BaseUrl *url.URL
 	log     *slog.Logger
-	storage storage.IStorage
+	storer  storage.Storer
 }
 
-func New(name string, cfg *config.Config, log *slog.Logger, storage storage.IStorage) (ILoader, error) {
+func New(name string, cfg *config.Config, log *slog.Logger, storage storage.Storer) (ILoader, error) {
 	source, err := storage.GetSourceByName(context.Background(), name)
 	if err != nil {
 		return nil, err

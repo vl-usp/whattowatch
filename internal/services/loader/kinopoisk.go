@@ -13,7 +13,7 @@ type KinopoiskLoader struct {
 	limit  int
 }
 
-func NewKinopoiskLoader(apiKey string, baseUrl string, log *slog.Logger, storage storage.IStorage) (*KinopoiskLoader, error) {
+func NewKinopoiskLoader(apiKey string, baseUrl string, log *slog.Logger, storer storage.Storer) (*KinopoiskLoader, error) {
 	u, err := url.Parse(baseUrl)
 	if err != nil {
 		return nil, err
@@ -21,7 +21,7 @@ func NewKinopoiskLoader(apiKey string, baseUrl string, log *slog.Logger, storage
 	return &KinopoiskLoader{
 		Loader: Loader{
 			log:     log,
-			storage: storage,
+			storer:  storer,
 			BaseUrl: u,
 		},
 		apiKey: apiKey,

@@ -8,8 +8,8 @@ import (
 	sq "github.com/Masterminds/squirrel"
 )
 
-func (pg *PostgreSQL) GetTMDbMovieIDs(ctx context.Context) ([]int, error) {
-	sql, args, err := sq.Select("id").PlaceholderFormat(sq.Dollar).From("tmdb.movies").ToSql()
+func (pg *PostgreSQL) GetTMDbTVIDs(ctx context.Context) ([]int, error) {
+	sql, args, err := sq.Select("id").PlaceholderFormat(sq.Dollar).From("tmdb.tvs").ToSql()
 	if err != nil {
 		return nil, err
 	}
@@ -30,36 +30,36 @@ func (pg *PostgreSQL) GetTMDbMovieIDs(ctx context.Context) ([]int, error) {
 	return ids, nil
 }
 
-func (pg *PostgreSQL) UpdateTMDbMovie(ctx context.Context, movie types.TMDbMovie) error {
+func (pg *PostgreSQL) UpdateTMDbTV(ctx context.Context, tv types.TMDbTV) error {
 	sql, args, err := sq.Update("tmdb.movies").SetMap(sq.Eq{
-		"overview":     movie.Overview,
-		"popularity":   movie.Popularity,
-		"poster_path":  movie.PosterPath,
-		"release_date": movie.ReleaseDate,
-		"vote_average": movie.VoteAverage,
-		"vote_count":   movie.VoteCount,
-	}).Where(sq.Eq{"id": movie.ID}).PlaceholderFormat(sq.Dollar).ToSql()
+		"overview":       tv.Overview,
+		"popularity":     tv.Popularity,
+		"poster_path":    tv.PosterPath,
+		"first_air_date": tv.FirstAirDate,
+		"vote_average":   tv.VoteAverage,
+		"vote_count":     tv.VoteCount,
+	}).Where(sq.Eq{"id": tv.ID}).PlaceholderFormat(sq.Dollar).ToSql()
 
 	if err != nil {
 		return fmt.Errorf("failed to build update query: %s", err.Error())
 	}
 	_, err = pg.pool.Exec(ctx, sql, args...)
 	if err != nil {
-		return fmt.Errorf("failed to update tmdb movie: %s", err.Error())
+		return fmt.Errorf("failed to update tmdb tv: %s", err.Error())
 	}
 	return nil
 }
 
-func (pg *PostgreSQL) InsertTMDbMovie(ctx context.Context, movie types.TMDbMovie) error {
+func (pg *PostgreSQL) InsertTMDbTV(ctx context.Context, tv types.TMDbTV) error {
 	sql, args, err := sq.Insert("tmdb.movies").SetMap(sq.Eq{
-		"id":           movie.ID,
-		"title":        movie.Title,
-		"overview":     movie.Overview,
-		"popularity":   movie.Popularity,
-		"poster_path":  movie.PosterPath,
-		"release_date": movie.ReleaseDate,
-		"vote_average": movie.VoteAverage,
-		"vote_count":   movie.VoteCount,
+		"id":             tv.ID,
+		"title":          tv.Title,
+		"overview":       tv.Overview,
+		"popularity":     tv.Popularity,
+		"poster_path":    tv.PosterPath,
+		"first_air_date": tv.FirstAirDate,
+		"vote_average":   tv.VoteAverage,
+		"vote_count":     tv.VoteCount,
 	}).PlaceholderFormat(sq.Dollar).ToSql()
 	if err != nil {
 		return fmt.Errorf("failed to build insert query: %s", err.Error())
@@ -72,32 +72,32 @@ func (pg *PostgreSQL) InsertTMDbMovie(ctx context.Context, movie types.TMDbMovie
 	return nil
 }
 
-func (pg *PostgreSQL) InsertTMDbMovies(ctx context.Context, movies []types.TMDbMovie) error {
-	builder := sq.Insert("tmdb.movies").Columns(
+func (pg *PostgreSQL) InsertTMDbTVs(ctx context.Context, tvs []types.TMDbTV) error {
+	builder := sq.Insert("tmdb.tvs").Columns(
 		"id",
 		"title",
 		"overview",
 		"popularity",
 		"poster_path",
-		"release_date",
+		"first_air_date",
 		"vote_average",
 		"vote_count",
 	).PlaceholderFormat(sq.Dollar)
 
-	for _, movie := range movies {
-		if movie.ReleaseDate == "" {
-			movie.ReleaseDate = "0001-01-01"
+	for _, tv := range tvs {
+		if tv.FirstAirDate == "" {
+			tv.FirstAirDate = "0001-01-01"
 		}
 
 		builder = builder.Values(
-			movie.ID,
-			movie.Title,
-			movie.Overview,
-			movie.Popularity,
-			movie.PosterPath,
-			movie.ReleaseDate,
-			movie.VoteAverage,
-			movie.VoteCount,
+			tv.ID,
+			tv.Title,
+			tv.Overview,
+			tv.Popularity,
+			tv.PosterPath,
+			tv.FirstAirDate,
+			tv.VoteAverage,
+			tv.VoteCount,
 		)
 	}
 
@@ -108,7 +108,7 @@ func (pg *PostgreSQL) InsertTMDbMovies(ctx context.Context, movies []types.TMDbM
 
 	_, err = pg.pool.Exec(ctx, sql, args...)
 	if err != nil {
-		return fmt.Errorf("failed to insert tmdb movie: %s", err.Error())
+		return fmt.Errorf("failed to insert tmdb tv: %s", err.Error())
 	}
 	return nil
 }

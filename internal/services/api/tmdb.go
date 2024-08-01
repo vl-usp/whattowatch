@@ -42,9 +42,6 @@ func (l *TMDbApi) GetMovieInfo(id int) (*types.TMDbMovie, error) {
 		Popularity:  movie.Popularity,
 		PosterPath:  movie.PosterPath,
 		ReleaseDate: movie.ReleaseDate,
-		Budget:      movie.Budget,
-		Revenue:     movie.Revenue,
-		Runtime:     movie.Runtime,
 		VoteAverage: movie.VoteAverage,
 		VoteCount:   movie.VoteCount,
 	}, nil
