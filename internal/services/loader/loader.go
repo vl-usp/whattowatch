@@ -17,7 +17,6 @@ type Loader struct {
 	ID      int
 	BaseUrl *url.URL
 	log     *slog.Logger
-	storer  storage.Storer
 }
 
 func New(name string, cfg *config.Config, log *slog.Logger, storage storage.Storer) (ILoader, error) {

@@ -28,6 +28,7 @@ func (w DiscoverType) EnumIndex() int {
 
 type TMDbLoader struct {
 	Loader
+	storer  storage.TMDbStorer
 	api     *tmdbLib.TMDb
 	options map[string]string
 }
@@ -46,9 +47,9 @@ func NewTMDbLoader(apiKey string, baseUrl string, log *slog.Logger, storer stora
 	loader := &TMDbLoader{
 		Loader: Loader{
 			log:     log,
-			storer:  storer,
 			BaseUrl: u,
 		},
+		storer:  storer,
 		api:     tmdbLib.Init(config),
 		options: make(map[string]string),
 	}
@@ -83,16 +84,12 @@ func (l *TMDbLoader) Load(ctx context.Context) error {
 
 	err1Ch := make(chan error)
 	err2Ch := make(chan error)
-	// wg := &sync.WaitGroup{}
-	// wg.Add(2)
 	go func(errCh chan error) {
-		// defer wg.Done()
 		l.log.Info("start discover and save movies")
 		err := l.DiscoverAndSave(ctx, Movie)
 		err1Ch <- err
 	}(err1Ch)
 	go func(errCh chan error) {
-		// defer wg.Done()
 		l.log.Info("start discover and save tvs")
 		err := l.DiscoverAndSave(ctx, TV)
 		err2Ch <- err
@@ -108,7 +105,6 @@ func (l *TMDbLoader) Load(ctx context.Context) error {
 	if err2 != nil {
 		return fmt.Errorf("failed to discover tvs: %s", err2.Error())
 	}
-	// wg.Wait()
 	return nil
 }
 

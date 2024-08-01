@@ -1,4 +1,4 @@
-package api
+package tmdb_api
 
 import (
 	"log/slog"
@@ -13,7 +13,7 @@ type TMDbApi struct {
 	options map[string]string
 }
 
-func NewTMDbApi(apiKey string, log *slog.Logger) (*TMDbApi, error) {
+func New(apiKey string, log *slog.Logger) (*TMDbApi, error) {
 	config := tmdb.Config{
 		APIKey:   apiKey,
 		Proxies:  nil,

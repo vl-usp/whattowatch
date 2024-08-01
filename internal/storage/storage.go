@@ -30,16 +30,23 @@ type TMDbGenreStorer interface {
 	InsertTMDbGenres(ctx context.Context, genres []types.TMDbGenre) error
 }
 
+type TMDbStorer interface {
+	TMDbTVStorer
+	TMDbMovieStorer
+	TMDbGenreStorer
+}
+
+type KinopoiskStorer interface {
+}
+
 type SourceStorer interface {
 	GetSources(ctx context.Context) ([]types.Source, error)
 	GetSourceByName(ctx context.Context, name string) (*types.Source, error)
 }
 
 type Storer interface {
+	TMDbStorer
 	SourceStorer
-	TMDbTVStorer
-	TMDbMovieStorer
-	TMDbGenreStorer
 }
 
 func New(cfg *config.Config, log *slog.Logger) (Storer, error) {

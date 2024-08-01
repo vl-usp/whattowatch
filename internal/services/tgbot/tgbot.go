@@ -22,9 +22,10 @@ func New(cfg *config.Config, log *slog.Logger) (*TGBot, error) {
 		cfg: cfg,
 	}
 	opts := []bot.Option{
+		bot.WithMiddlewares(tgbot.showMessageWithUserID, tgbot.showMessageWithUserName),
 		bot.WithDefaultHandler(tgbot.defaultHandler),
 	}
-	b, err := bot.New(cfg.Tokens.TGBotToken, opts...)
+	b, err := bot.New(cfg.Tokens.TGBot, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -41,6 +42,6 @@ func (t *TGBot) Start() {
 }
 
 func (t *TGBot) addHandlers() {
-	t.bot.RegisterHandler(bot.HandlerTypeMessageText, "/start", bot.MatchTypeExact, t.defaultHandler)
-	t.bot.RegisterHandler(bot.HandlerTypeMessageText, "/help", bot.MatchTypeExact, t.helpHandler)
+	t.bot.RegisterHandler(bot.HandlerTypeMessageText, "/start", bot.MatchTypeExact, t.startHandler)
+	// t.bot.RegisterHandler(bot.HandlerTypeMessageText, "/help", bot.MatchTypeExact, t.helpHandler)
 }
