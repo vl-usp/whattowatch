@@ -11,7 +11,7 @@ import (
 func main() {
 	cfg := config.MustLoad()
 
-	log, file := logger.SetupLogger(cfg.Env, cfg.LogDir)
+	log, file := logger.SetupLogger(cfg.Env, cfg.LogDir+"/loader")
 	defer file.Close()
 
 	storer, err := storage.New(cfg, log)

@@ -7,6 +7,9 @@ build:
 	go build -o $(LOCAL_BIN)/loader cmd/loader/main.go
 	go build -o $(LOCAL_BIN)/bot cmd/bot/main.go
 
+bot: build
+	$(LOCAL_BIN)/bot
+
 load: build
 	$(LOCAL_BIN)/loader
 

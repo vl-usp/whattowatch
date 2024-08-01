@@ -53,6 +53,8 @@ func NewTMDbLoader(apiKey string, baseUrl string, log *slog.Logger, storer stora
 		options: make(map[string]string),
 	}
 	loader.options["language"] = "ru-RU"
+	loader.options["include_adult"] = "true"
+	loader.options["sort_by"] = "vote_average.desc"
 
 	return loader, nil
 }
