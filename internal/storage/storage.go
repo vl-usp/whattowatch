@@ -7,46 +7,42 @@ import (
 	"whattowatch/internal/config"
 	"whattowatch/internal/storage/postgresql"
 	"whattowatch/internal/types"
+
+	"github.com/google/uuid"
 )
 
-type TMDbTVStorer interface {
-	GetTMDbTVIDs(ctx context.Context) ([]int, error)
-	UpdateTMDbTV(ctx context.Context, tv types.TMDbTV) error
-	InsertTMDbTV(ctx context.Context, tv types.TMDbTV) error
-	InsertTMDbTVs(ctx context.Context, tvs []types.TMDbTV) error
+type FilmContentStorer interface {
+	GetFilmContent(ctx context.Context, id uuid.UUID) (types.FilmContent, error)
+	GetFilmContentTMDbIDs(ctx context.Context) ([]uuid.UUID, error)
+	GetFilmContentByTitles(ctx context.Context, titles []string) (types.FilmContents, error)
+	UpdateFilmContent(ctx context.Context, content types.FilmContent) error
+	InsertFilmContent(ctx context.Context, content types.FilmContent) error
+	InsertFilmContents(ctx context.Context, contents types.FilmContents) error
 }
 
-type TMDbMovieStorer interface {
-	GetTMDbMovieIDs(ctx context.Context) ([]int, error)
-	UpdateTMDbMovie(ctx context.Context, movie types.TMDbMovie) error
-	InsertTMDbMovie(ctx context.Context, movie types.TMDbMovie) error
-	InsertTMDbMovies(ctx context.Context, movies []types.TMDbMovie) error
+type FilmGenreStorer interface {
+	InsertFilmGenre(ctx context.Context, genre types.FilmGenre) error
+	InsertFilmGenres(ctx context.Context, genres []types.FilmGenre) error
+	InsertFilmContentGenres(ctx context.Context, filmContentID uuid.UUID, tmdbGenreIDs []int32) error
 }
 
-type TMDbGenreStorer interface {
-	InsertTMDbGenre(ctx context.Context, genre types.TMDbGenre) error
-	InsertTMDbMoviesGenres(ctx context.Context, movieID int, genreIDs []int32) error
-	InsertTMDbTVsGenres(ctx context.Context, tvID int, genreIDs []int32) error
-	InsertTMDbGenres(ctx context.Context, genres []types.TMDbGenre) error
+type UserStorer interface {
+	GetUser(ctx context.Context, id int) (types.User, error)
+	InsertUser(ctx context.Context, user types.User) error
 }
 
-type TMDbStorer interface {
-	TMDbTVStorer
-	TMDbMovieStorer
-	TMDbGenreStorer
-}
-
-type KinopoiskStorer interface {
-}
-
-type SourceStorer interface {
-	GetSources(ctx context.Context) ([]types.Source, error)
-	GetSourceByName(ctx context.Context, name string) (*types.Source, error)
+type FavoriteStorer interface {
+	// Favorites
+	InsertUserFavorites(ctx context.Context, userID int, filmContentIds []uuid.UUID) error
+	GetUserFavorites(ctx context.Context, userID int) (types.FilmContents, error)
+	GetFilmContentByTitles(ctx context.Context, titles []string) (types.FilmContents, error)
 }
 
 type Storer interface {
-	TMDbStorer
-	SourceStorer
+	FilmContentStorer
+	FilmGenreStorer
+	UserStorer
+	FavoriteStorer
 }
 
 func New(cfg *config.Config, log *slog.Logger) (Storer, error) {

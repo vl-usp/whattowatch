@@ -18,8 +18,7 @@ func main() {
 	if err != nil {
 		log.Error("creating a storage error", "error", err.Error())
 	}
-
-	loader, err := loader.New("TMDb", cfg, log, storer)
+	loader, err := loader.NewTMDbLoader(cfg.Tokens.TMDb, cfg.Urls.TMDbApiUrl, log, storer)
 	if err != nil {
 		log.Error("creating a loader error", "error", err.Error())
 	}

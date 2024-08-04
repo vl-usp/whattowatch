@@ -31,3 +31,9 @@ migration-down:
 docker-up:
 	docker compose build --progress plain &> tmp/build.log
 	docker compose up -d
+
+reboot-db:
+	docker compose down
+	sudo rm -r $(CURDIR)/.db
+	docker compose up -d
+	make migration-up

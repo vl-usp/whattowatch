@@ -1,8 +1,9 @@
 package main
 
 import (
+	"whattowatch/internal/botkit"
 	"whattowatch/internal/config"
-	"whattowatch/internal/services/tgbot"
+	"whattowatch/internal/storage"
 	"whattowatch/pkg/logger"
 )
 
@@ -13,7 +14,12 @@ func main() {
 	log, file := logger.SetupLogger(cfg.Env, cfg.LogDir+"/bot")
 	defer file.Close()
 
-	bot, err := tgbot.New(cfg, log)
+	storer, err := storage.New(cfg, log)
+	if err != nil {
+		log.Error("creating a storage error", "error", err.Error())
+	}
+
+	bot, err := botkit.NewTGBot(cfg, log, storer)
 	if err != nil {
 		log.Error("creating a TGBot error", "error", err.Error())
 		panic(err.Error())

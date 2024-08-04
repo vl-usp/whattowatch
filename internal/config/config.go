@@ -12,8 +12,8 @@ type Config struct {
 	StorageType string
 	LogDir      string
 	DB          DBConfig
-	ParseUrls   ParseUrls
 	Tokens      Tokens
+	Urls        Urls
 }
 
 // MustLoad load configuration.
@@ -28,8 +28,8 @@ func MustLoad() *Config {
 		StorageType: os.Getenv("STORAGE_TYPE"),
 		LogDir:      os.Getenv("LOG_DIR"),
 		DB:          NewDBConfig(),
-		ParseUrls:   NewParseUrls(),
 		Tokens:      NewTokens(),
+		Urls:        NewUrls(),
 	}
 
 	return cfg
