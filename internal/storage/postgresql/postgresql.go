@@ -5,6 +5,8 @@ import (
 	"log/slog"
 	"whattowatch/internal/config"
 
+	pgxUUID "github.com/jackc/pgx-gofrs-uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -14,7 +16,17 @@ type PostgreSQL struct {
 }
 
 func New(cfg *config.Config, log *slog.Logger) (*PostgreSQL, error) {
-	pool, err := pgxpool.New(context.Background(), cfg.DB.PostgresDSN)
+	pgxConfig, err := pgxpool.ParseConfig(cfg.DB.PostgresDSN)
+	if err != nil {
+		return nil, err
+	}
+
+	pgxConfig.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
+		pgxUUID.Register(conn.TypeMap())
+		return nil
+	}
+
+	pool, err := pgxpool.NewWithConfig(context.Background(), pgxConfig)
 	if err != nil {
 		return nil, err
 	}

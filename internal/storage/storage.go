@@ -8,22 +8,24 @@ import (
 	"whattowatch/internal/storage/postgresql"
 	"whattowatch/internal/types"
 
-	"github.com/google/uuid"
+	"github.com/gofrs/uuid"
 )
 
-type FilmContentStorer interface {
-	GetFilmContent(ctx context.Context, id uuid.UUID) (types.FilmContent, error)
-	GetFilmContentTMDbIDs(ctx context.Context) ([]uuid.UUID, error)
-	GetFilmContentByTitles(ctx context.Context, titles []string) (types.FilmContents, error)
-	UpdateFilmContent(ctx context.Context, content types.FilmContent) error
-	InsertFilmContent(ctx context.Context, content types.FilmContent) error
-	InsertFilmContents(ctx context.Context, contents types.FilmContents) error
+type ContentStorer interface {
+	GetContent(ctx context.Context, id uuid.UUID) (types.Content, error)
+	GetContentTMDbIDs(ctx context.Context) ([]uuid.UUID, error)
+	GetContentByTitles(ctx context.Context, titles []string) (types.Contents, error)
+	InsertContent(ctx context.Context, content types.Content) error
+	InsertContents(ctx context.Context, contents types.Contents) error
+	UpdateContent(ctx context.Context, content types.Content) error
 }
 
-type FilmGenreStorer interface {
-	InsertFilmGenre(ctx context.Context, genre types.FilmGenre) error
-	InsertFilmGenres(ctx context.Context, genres []types.FilmGenre) error
-	InsertFilmContentGenres(ctx context.Context, filmContentID uuid.UUID, tmdbGenreIDs []int32) error
+type GenreStorer interface {
+	GetContentGenres(ctx context.Context, filmContentID uuid.UUID) (types.Genres, error)
+	GetGenresByIDs(ctx context.Context, ids []int) (types.Genres, error)
+	InsertGenre(ctx context.Context, genre types.Genre) error
+	InsertGenres(ctx context.Context, genres types.Genres) error
+	InsertContentGenres(ctx context.Context, filmContentID uuid.UUID, tmdbGenreIDs []int32) error
 }
 
 type UserStorer interface {
@@ -32,15 +34,18 @@ type UserStorer interface {
 }
 
 type FavoriteStorer interface {
-	// Favorites
-	InsertUserFavorites(ctx context.Context, userID int, filmContentIds []uuid.UUID) error
-	GetUserFavorites(ctx context.Context, userID int) (types.FilmContents, error)
-	GetFilmContentByTitles(ctx context.Context, titles []string) (types.FilmContents, error)
+	GetUserFavorites(ctx context.Context, userID int) (types.Contents, error)
+	GetUserFavoritesIDs(ctx context.Context, userID int) ([]uuid.UUID, error)
+	GetUserFavoriteIDByTitle(ctx context.Context, userID int, title string) (uuid.UUID, error)
+	GetUserFavoritesByType(ctx context.Context, userID int) (types.ContentsByTypes, error)
+	GetContentByTitles(ctx context.Context, titles []string) (types.Contents, error)
+	InsertUserFavorites(ctx context.Context, userID int, filmContentIDs []uuid.UUID) error
+	DeleteUserFavorites(ctx context.Context, userID int, filmContentIDs []uuid.UUID) error
 }
 
 type Storer interface {
-	FilmContentStorer
-	FilmGenreStorer
+	ContentStorer
+	GenreStorer
 	UserStorer
 	FavoriteStorer
 }

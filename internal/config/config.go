@@ -8,6 +8,7 @@ import (
 )
 
 type Config struct {
+	BotName     string
 	Env         string
 	StorageType string
 	LogDir      string
@@ -24,6 +25,7 @@ func MustLoad() *Config {
 	}
 
 	cfg := &Config{
+		BotName:     os.Getenv("BOT_NAME"),
 		Env:         os.Getenv("ENV"),
 		StorageType: os.Getenv("STORAGE_TYPE"),
 		LogDir:      os.Getenv("LOG_DIR"),
