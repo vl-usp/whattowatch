@@ -7,7 +7,6 @@ require (
 	github.com/go-telegram/bot v1.6.1
 	github.com/go-telegram/ui v0.3.2
 	github.com/gofrs/uuid v4.4.0+incompatible
-	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx-gofrs-uuid v0.0.0-20230224015001-1d428863c2e2
 	github.com/jackc/pgx/v5 v5.6.0
 	github.com/joho/godotenv v1.5.1
