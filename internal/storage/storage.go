@@ -38,9 +38,14 @@ type FavoriteStorer interface {
 	GetUserFavoritesIDs(ctx context.Context, userID int) ([]uuid.UUID, error)
 	GetUserFavoriteIDByTitle(ctx context.Context, userID int, title string) (uuid.UUID, error)
 	GetUserFavoritesByType(ctx context.Context, userID int) (types.ContentsByTypes, error)
-	GetContentByTitles(ctx context.Context, titles []string) (types.Contents, error)
 	InsertUserFavorites(ctx context.Context, userID int, filmContentIDs []uuid.UUID) error
 	DeleteUserFavorites(ctx context.Context, userID int, filmContentIDs []uuid.UUID) error
+}
+
+type ViewedStorer interface {
+	InsertUserViewed(ctx context.Context, userID int, filmContentID uuid.UUID) error
+	InsertUserVieweds(ctx context.Context, userID int, filmContentIDs []uuid.UUID) error
+	GetUserViewed(ctx context.Context, userID int) (types.UserVieweds, error)
 }
 
 type Storer interface {

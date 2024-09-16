@@ -25,10 +25,11 @@ func (t *TGBot) menuHandler(ctx context.Context, b *bot.Bot, update *models.Upda
 
 	menu := inline.New(b).
 		Row().
-		Button("Рекомендации", []byte("my:"+userID), t.onSelectRecomendations).
-		Button("Общие рекомендации", []byte("joint:"+userID), t.onSelectRecomendations).
+		Button("Личные рекомендации", []byte("my:"+userID), t.onSelectRecomendations).
+		Button("Парные рекомендации", []byte("joint:"+userID), t.onSelectRecomendations).
 		Row().
-		Button("Мои избранные", []byte(userID), t.onSelectShowFavorites)
+		Button("Избранные", []byte(userID), t.onSelectShowFavorites) //.
+		// Button("Просмотренные", []byte(userID), t.onSelectShowViewed)
 
 	_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID:      update.Message.Chat.ID,
