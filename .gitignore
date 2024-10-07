@@ -3,4 +3,5 @@
 .ollama
 .vscode
 .env
+.tmp
 bin

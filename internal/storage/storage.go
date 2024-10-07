@@ -21,11 +21,11 @@ type ContentStorer interface {
 }
 
 type GenreStorer interface {
-	GetContentGenres(ctx context.Context, filmContentID uuid.UUID) (types.Genres, error)
+	GetGenres(ctx context.Context, contentID uuid.UUID) (types.Genres, error)
 	GetGenresByIDs(ctx context.Context, ids []int) (types.Genres, error)
 	InsertGenre(ctx context.Context, genre types.Genre) error
 	InsertGenres(ctx context.Context, genres types.Genres) error
-	InsertContentGenres(ctx context.Context, filmContentID uuid.UUID, tmdbGenreIDs []int32) error
+	InsertContentGenres(ctx context.Context, contentID uuid.UUID, tmdbGenreIDs []int32) error
 }
 
 type UserStorer interface {
@@ -33,26 +33,10 @@ type UserStorer interface {
 	InsertUser(ctx context.Context, user types.User) error
 }
 
-type FavoriteStorer interface {
-	GetUserFavorites(ctx context.Context, userID int) (types.Contents, error)
-	GetUserFavoritesIDs(ctx context.Context, userID int) ([]uuid.UUID, error)
-	GetUserFavoriteIDByTitle(ctx context.Context, userID int, title string) (uuid.UUID, error)
-	GetUserFavoritesByType(ctx context.Context, userID int) (types.ContentsByTypes, error)
-	InsertUserFavorites(ctx context.Context, userID int, filmContentIDs []uuid.UUID) error
-	DeleteUserFavorites(ctx context.Context, userID int, filmContentIDs []uuid.UUID) error
-}
-
-type ViewedStorer interface {
-	InsertUserViewed(ctx context.Context, userID int, filmContentID uuid.UUID) error
-	InsertUserVieweds(ctx context.Context, userID int, filmContentIDs []uuid.UUID) error
-	GetUserViewed(ctx context.Context, userID int) (types.UserVieweds, error)
-}
-
 type Storer interface {
 	ContentStorer
 	GenreStorer
 	UserStorer
-	FavoriteStorer
 }
 
 func New(cfg *config.Config, log *slog.Logger) (Storer, error) {

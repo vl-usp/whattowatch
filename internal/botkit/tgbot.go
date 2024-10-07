@@ -39,7 +39,9 @@ func NewTGBot(cfg *config.Config, log *slog.Logger, storer storage.Storer) (*TGB
 	}
 	tgbot.bot = b
 
-	tgbot.addHandlers()
+	tgbot.useKeyboard()
+	tgbot.useHandlers()
+
 	return tgbot, nil
 }
 
@@ -51,10 +53,22 @@ func (t *TGBot) Start() {
 	t.bot.Start(ctx)
 }
 
-func (t *TGBot) addHandlers() {
+func (t *TGBot) useHandlers() {
 	t.bot.RegisterHandler(bot.HandlerTypeMessageText, "/help", bot.MatchTypePrefix, t.helpHandler)
 	t.bot.RegisterHandler(bot.HandlerTypeMessageText, "/start", bot.MatchTypePrefix, t.registerHandler)
-	t.bot.RegisterHandler(bot.HandlerTypeMessageText, "/menu", bot.MatchTypePrefix, t.menuHandler)
-	t.bot.RegisterHandler(bot.HandlerTypeMessageText, "/add", bot.MatchTypePrefix, t.addFavoriteHandler)
-	t.bot.RegisterHandler(bot.HandlerTypeMessageText, "/remove", bot.MatchTypePrefix, t.removeFavoriteHandler)
+	// t.bot.RegisterHandler(bot.HandlerTypeMessageText, "/menu", bot.MatchTypePrefix, t.menuHandler)
+
+	t.bot.RegisterHandler(bot.HandlerTypeMessageText, "/reply_keyboard", bot.MatchTypePrefix, t.handlerReplyKeyboard)
+
+	t.bot.RegisterHandler(bot.HandlerTypeMessageText, "Фильмы", bot.MatchTypeExact, onMoviesKeyboard)
+
+	// t.bot.RegisterHandler(bot.HandlerTypeMessageText, "/add", bot.MatchTypePrefix, t.addFavoriteHandler)
+	// t.bot.RegisterHandler(bot.HandlerTypeMessageText, "/remove", bot.MatchTypePrefix, t.removeFavoriteHandler)
+
+	// t.bot.RegisterHandler(bot.HandlerTypeMessageText, "/m", bot.MatchTypePrefix, t.searchMovieHandler)
+	// t.bot.RegisterHandler(bot.HandlerTypeMessageText, "/t", bot.MatchTypePrefix, t.searchTVHandler)
+}
+
+func (t *TGBot) useKeyboard() {
+	initReplyKeyboard(t.bot)
 }

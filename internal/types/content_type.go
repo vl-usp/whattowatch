@@ -5,16 +5,16 @@ import "fmt"
 type ContentType int
 
 const (
-	MovieContentType ContentType = iota + 1
-	TVContentType
+	Movie ContentType = iota + 1
+	TV
 )
 
 func (w ContentType) String() string {
-	return [...]string{"MovieContentType", "TVContentType"}[w-1]
+	return [...]string{"Movie", "TV"}[w-1]
 }
 
 func ParseContentType(s string) (ContentType, error) {
-	for i, name := range [...]string{"MovieContentType", "TVContentType"} {
+	for i, name := range [...]string{"Movie", "TV"} {
 		if name == s {
 			return ContentType(i + 1), nil
 		}
@@ -24,9 +24,4 @@ func ParseContentType(s string) (ContentType, error) {
 
 func (w ContentType) EnumIndex() int {
 	return int(w)
-}
-
-type TMDbContentType struct {
-	ID   int
-	Name string
 }

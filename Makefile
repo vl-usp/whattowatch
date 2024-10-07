@@ -3,6 +3,8 @@ LOCAL_BIN=$(CURDIR)/bin
 NAME=default
 MIGRATION_DIR=$(CURDIR)/migration
 
+.PHONY: build install-deps bot load migration-create migration-status migration-up migration-down docker-up 
+
 build:
 	go build -o $(LOCAL_BIN)/loader cmd/loader/main.go
 	go build -o $(LOCAL_BIN)/bot cmd/bot/main.go
@@ -29,11 +31,6 @@ migration-down:
 	$(LOCAL_BIN)/goose -dir $(MIGRATION_DIR) postgres $(POSTGRES_DSN) down -v
 
 docker-up:
-	docker compose build --progress plain &> tmp/build.log
+	mkdir -p .tmp
+	docker compose build --progress plain &> .tmp/build.log
 	docker compose up -d
-
-reboot-db:
-	docker compose down
-	sudo rm -r $(CURDIR)/.db
-	docker compose up -d
-	make migration-up

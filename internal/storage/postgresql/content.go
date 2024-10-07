@@ -93,9 +93,8 @@ func (pg *PostgreSQL) GetContentByTitles(ctx context.Context, titles []string) (
 }
 
 func (pg *PostgreSQL) InsertContent(ctx context.Context, content types.Content) error {
-	sql, args, err := sq.Insert("content").SetMap(sq.Eq{
+	sql1, args1, err := sq.Insert("content").SetMap(sq.Eq{
 		"id":              content.ID,
-		"tmdb_id":         content.TMDbID,
 		"content_type_id": content.ContentTypeID,
 		"title":           content.Title,
 		"overview":        content.Overview,
@@ -109,9 +108,33 @@ func (pg *PostgreSQL) InsertContent(ctx context.Context, content types.Content) 
 		return fmt.Errorf("failed to build insert query: %s", err.Error())
 	}
 
-	_, err = pg.pool.Exec(ctx, sql, args...)
+	sql2, args2, err := sq.Insert("link_tmdb_contents").SetMap(sq.Eq{
+		"content_id": content.ID,
+		"tmdb_id":    content.TMDbID,
+	}).PlaceholderFormat(sq.Dollar).ToSql()
 	if err != nil {
-		return fmt.Errorf("failed to insert film content: %s, %v", err.Error(), content)
+		return fmt.Errorf("failed to build insert query: %s", err.Error())
+	}
+
+	tx, err := pg.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	_, err = pg.pool.Exec(ctx, sql1, args1...)
+	if err != nil {
+		return fmt.Errorf("failed to insert content: %s, %v", err.Error(), content)
+	}
+
+	_, err = pg.pool.Exec(ctx, sql2, args2...)
+	if err != nil {
+		return fmt.Errorf("failed to insert content: %s, %v", err.Error(), content)
+	}
+
+	err = tx.Commit(ctx)
+	if err != nil {
+		return err
 	}
 	return nil
 }
@@ -119,7 +142,6 @@ func (pg *PostgreSQL) InsertContent(ctx context.Context, content types.Content) 
 func (pg *PostgreSQL) InsertContents(ctx context.Context, contents types.Contents) error {
 	builder := sq.Insert("content").Columns(
 		"id",
-		"tmdb_id",
 		"content_type_id",
 		"title",
 		"overview",
@@ -133,7 +155,6 @@ func (pg *PostgreSQL) InsertContents(ctx context.Context, contents types.Content
 	for _, c := range contents {
 		builder = builder.Values(
 			c.ID,
-			c.TMDbID,
 			c.ContentTypeID,
 			c.Title,
 			c.Overview,
@@ -145,14 +166,39 @@ func (pg *PostgreSQL) InsertContents(ctx context.Context, contents types.Content
 		)
 	}
 
-	sql, args, err := builder.Suffix("ON CONFLICT DO NOTHING").ToSql()
+	sql1, args1, err := builder.Suffix("ON CONFLICT DO NOTHING").ToSql()
 	if err != nil {
 		return fmt.Errorf("failed to build insert query: %s", err.Error())
 	}
 
-	_, err = pg.pool.Exec(ctx, sql, args...)
+	builder = sq.Insert("link_tmdb_contents").Columns("content_id", "tmdb_id")
+	for _, c := range contents {
+		builder = builder.Values(c.ID, c.TMDbID)
+	}
+	sql2, args2, err := builder.Suffix("ON CONFLICT DO NOTHING").ToSql()
+	if err != nil {
+		return fmt.Errorf("failed to build insert query: %s", err.Error())
+	}
+
+	tx, err := pg.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	_, err = pg.pool.Exec(ctx, sql1, args1...)
 	if err != nil {
 		return fmt.Errorf("failed to insert film content: %s", err.Error())
+	}
+
+	_, err = pg.pool.Exec(ctx, sql2, args2...)
+	if err != nil {
+		return fmt.Errorf("failed to insert film content: %s", err.Error())
+	}
+
+	err = tx.Commit(ctx)
+	if err != nil {
+		return err
 	}
 
 	return nil

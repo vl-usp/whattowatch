@@ -11,7 +11,6 @@ import (
 
 type Content struct {
 	ID            uuid.UUID
-	TMDbID        int
 	ContentTypeID int
 	Title         string
 	Overview      string
@@ -21,6 +20,7 @@ type Content struct {
 	VoteAverage   float32
 	VoteCount     uint32
 	Genres        Genres
+	TMDbID        int
 }
 
 func GetReleaseDate(in string) (sql.NullTime, error) {

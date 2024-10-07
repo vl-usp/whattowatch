@@ -22,8 +22,8 @@ func (pg *PostgreSQL) GetUser(ctx context.Context, id int) (types.User, error) {
 }
 
 func (pg *PostgreSQL) InsertUser(ctx context.Context, user types.User) error {
-	builder := sq.Insert("users").Columns("id", "first_name", "last_name", "username", "language_code")
-	builder = builder.Values(user.ID, user.FirstName, user.LastName, user.Username, user.LanguageCode)
+	builder := sq.Insert("users").Columns("id", "first_name", "last_name", "username", "language_code", "created_at")
+	builder = builder.Values(user.ID, user.FirstName, user.LastName, user.Username, user.LanguageCode, user.CreatedAt)
 	sql, args, err := builder.Suffix("ON CONFLICT DO NOTHING").PlaceholderFormat(sq.Dollar).ToSql()
 	if err != nil {
 		return err

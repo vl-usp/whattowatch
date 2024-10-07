@@ -27,9 +27,7 @@ type TMDbLoader struct {
 
 func NewTMDbLoader(apiKey string, baseUrl string, log *slog.Logger, storer storage.Storer) (*TMDbLoader, error) {
 	config := tmdbLib.Config{
-		APIKey:   apiKey,
-		Proxies:  nil,
-		UseProxy: false,
+		APIKey: apiKey,
 	}
 	u, err := url.Parse(baseUrl)
 	if err != nil {
@@ -43,7 +41,7 @@ func NewTMDbLoader(apiKey string, baseUrl string, log *slog.Logger, storer stora
 		api:     tmdbLib.Init(config),
 		options: make(map[string]string),
 	}
-	loader.options["language"] = "ru-RU"
+	// loader.options["language"] = "ru-RU"
 
 	loader.log.Info("loader initialized", "url", baseUrl, "opts", loader.options)
 
@@ -51,11 +49,11 @@ func NewTMDbLoader(apiKey string, baseUrl string, log *slog.Logger, storer stora
 }
 
 func (l *TMDbLoader) Load(ctx context.Context) error {
-	// load genres before discover
 	movieGenres, err := l.api.GetMovieGenres(l.options)
 	if err != nil {
 		return fmt.Errorf("failed to get movie genres: %s", err.Error())
 	}
+	l.log.Debug("get movie genres", "genres", movieGenres.Genres)
 	genres := make(types.Genres, 0, len(movieGenres.Genres))
 	for _, genre := range movieGenres.Genres {
 		id, err := uuid.NewV7()
@@ -86,12 +84,12 @@ func (l *TMDbLoader) Load(ctx context.Context) error {
 	err2Ch := make(chan error)
 	go func(errCh chan error) {
 		l.log.Info("start discover and save movies")
-		err := l.DiscoverAndSave(ctx, types.MovieContentType)
+		err := l.DiscoverAndSave(ctx, types.Movie)
 		err1Ch <- err
 	}(err1Ch)
 	go func(errCh chan error) {
 		l.log.Info("start discover and save tvs")
-		err := l.DiscoverAndSave(ctx, types.TVContentType)
+		err := l.DiscoverAndSave(ctx, types.TV)
 		err2Ch <- err
 	}(err2Ch)
 
@@ -115,7 +113,7 @@ func (l *TMDbLoader) DiscoverAndSave(ctx context.Context, dt types.ContentType) 
 		l.options["page"] = fmt.Sprintf("%d", page)
 
 		switch dt {
-		case types.MovieContentType:
+		case types.Movie:
 			res, err := l.api.DiscoverMovie(l.options)
 			if err != nil {
 				l.log.Error("failed to discover movies", "error", err.Error())
@@ -137,7 +135,6 @@ func (l *TMDbLoader) DiscoverAndSave(ctx context.Context, dt types.ContentType) 
 				}
 				movies = append(movies, types.Content{
 					ID:            movieUUID,
-					TMDbID:        movie.ID,
 					ContentTypeID: dt.EnumIndex(),
 					Title:         movie.Title,
 					Overview:      movie.Overview,
@@ -146,6 +143,7 @@ func (l *TMDbLoader) DiscoverAndSave(ctx context.Context, dt types.ContentType) 
 					ReleaseDate:   releaseDate,
 					VoteAverage:   movie.VoteAverage,
 					VoteCount:     movie.VoteCount,
+					TMDbID:        movie.ID,
 				})
 
 				moviesGenresMap[movieUUID] = movie.GenreIDs
@@ -164,7 +162,7 @@ func (l *TMDbLoader) DiscoverAndSave(ctx context.Context, dt types.ContentType) 
 					return err
 				}
 			}
-		case types.TVContentType:
+		case types.TV:
 			res, err := l.api.DiscoverTV(l.options)
 			if err != nil {
 				l.log.Error("failed to discover TVs", "error", err.Error())

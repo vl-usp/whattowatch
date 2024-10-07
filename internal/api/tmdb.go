@@ -3,9 +3,7 @@ package api
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"log/slog"
-	"sync"
 	"time"
 	"whattowatch/internal/storage"
 	"whattowatch/internal/types"
@@ -32,102 +30,6 @@ func New(apiKey string, storer storage.Storer, log *slog.Logger) *TMDbApi {
 
 		log: log.With("pkg", "api"),
 	}
-}
-
-func (api *TMDbApi) GetAllRecomendations(ctx context.Context, userID int) (types.ContentsByTypes, error) {
-	favorites, err := api.storer.GetUserFavoritesByType(ctx, userID)
-	if err != nil {
-		return nil, err
-	}
-
-	tvsCh := make(chan types.Contents, 20)
-	moviesCh := make(chan types.Contents, 20)
-	errCh := make(chan error)
-	for contentType, contents := range favorites {
-		switch contentType {
-		case types.MovieContentType:
-			go func() {
-				movies, err := api.GetMoviesRecomendations(ctx, contents)
-				if err != nil {
-					errCh <- err
-				}
-				moviesCh <- movies
-			}()
-		case types.TVContentType:
-			go func() {
-				tvs, err := api.GetTVsRecomendations(ctx, contents)
-				if err != nil {
-					errCh <- err
-				}
-				tvsCh <- tvs
-			}()
-		}
-	}
-
-	m := make(types.ContentsByTypes)
-	mu := &sync.Mutex{}
-	for i := 0; i < 2; i++ {
-		go func() {
-			for {
-				select {
-				case err := <-errCh:
-					api.log.Error("failed to get recomendations", "err", err)
-				case content := <-moviesCh:
-					mu.Lock()
-					m[types.MovieContentType] = append(m[types.MovieContentType], content...)
-					mu.Unlock()
-				case content := <-tvsCh:
-					mu.Lock()
-					m[types.TVContentType] = append(m[types.TVContentType], content...)
-					mu.Unlock()
-				}
-			}
-		}()
-	}
-
-	return m, nil
-}
-
-func (api *TMDbApi) GetRecomendations(ctx context.Context, userID int, contentType types.ContentType) (types.ContentsByGenres, error) {
-	log := api.log.With("fn", "GetRecomendations", "userID", userID, "contentType", contentType)
-	favorites, err := api.storer.GetUserFavoritesByType(ctx, userID)
-	if err != nil {
-		log.Error("failed to get recomendations", "error", err.Error())
-		return nil, err
-	}
-
-	if len(favorites[contentType]) == 0 {
-		log.Error("failed to get recomendations", "error", "user favorites not found. please, add favorites before use this command")
-		return nil, fmt.Errorf("user favorites not found. please, add favorites before use this command")
-	}
-
-	var recs types.Contents
-	switch contentType {
-	case types.MovieContentType:
-		recs, err = api.GetMoviesRecomendations(ctx, favorites[contentType])
-		if err != nil {
-			log.Error("failed to get movies recomendations", "error", err.Error())
-			return nil, err
-		}
-	case types.TVContentType:
-		recs, err = api.GetTVsRecomendations(ctx, favorites[contentType])
-		if err != nil {
-			log.Error("failed to get tvs recomendations", "error", err.Error())
-			return nil, err
-		}
-	default:
-		log.Error("failed to get recomendations", "error", "content type not found")
-		return nil, fmt.Errorf("content type not found")
-	}
-
-	result := make(types.ContentsByGenres, 0)
-	for _, rec := range recs {
-		if len(rec.Genres) > 0 {
-			result[rec.Genres[0].Name] = append(result[rec.Genres[0].Name], rec)
-		}
-	}
-
-	return result, nil
 }
 
 func (api *TMDbApi) GetMoviesRecomendations(ctx context.Context, movies types.Contents) (types.Contents, error) {
@@ -198,4 +100,8 @@ func (api *TMDbApi) GetTVsRecomendations(ctx context.Context, tvs types.Contents
 		}
 	}
 	return contents, nil
+}
+
+func (api *TMDbApi) GetTopMovies(ctx context.Context) (types.Contents, error) {
+	return nil, nil
 }
