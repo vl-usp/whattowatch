@@ -39,7 +39,7 @@ func (pg *PostgreSQL) GetGenres(ctx context.Context, contentID int64) (types.Gen
 	return genres, nil
 }
 
-func (pg *PostgreSQL) GetGenresByIDs(ctx context.Context, ids []int) (types.Genres, error) {
+func (pg *PostgreSQL) GetGenresByIDs(ctx context.Context, ids []int64) (types.Genres, error) {
 	sql, args, err := sq.Select("t1.id", "t1.name", "t1.pretty_name").
 		From("genres t1").
 		Where("t1.id = any(?)", ids).PlaceholderFormat(sq.Dollar).ToSql()

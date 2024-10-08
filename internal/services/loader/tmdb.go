@@ -124,7 +124,7 @@ func (l *TMDbLoader) loadGenres(ctx context.Context) error {
 
 func (l *TMDbLoader) discoverAndSave(ctx context.Context, dt types.ContentType) error {
 	fromPage := 1
-	toPage := 1000
+	toPage := 500
 	for page := fromPage; page <= toPage; page++ {
 		l.options["page"] = fmt.Sprintf("%d", page)
 

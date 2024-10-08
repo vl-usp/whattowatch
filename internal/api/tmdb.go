@@ -8,34 +8,40 @@ import (
 	"whattowatch/internal/storage"
 	"whattowatch/internal/types"
 
-	"github.com/ryanbradynd05/go-tmdb"
+	tmdb "github.com/cyruzin/golang-tmdb"
 )
 
 type TMDbApi struct {
-	api    *tmdb.TMDb
+	client *tmdb.Client
 	opts   map[string]string
 	storer storage.Storer
 
 	log *slog.Logger
 }
 
-func New(apiKey string, storer storage.Storer, log *slog.Logger) *TMDbApi {
+func New(apiKey string, storer storage.Storer, log *slog.Logger) (*TMDbApi, error) {
 	opts := make(map[string]string)
 	opts["language"] = "ru-RU"
+
+	c, err := tmdb.Init(apiKey)
+	if err != nil {
+		return nil, err
+	}
+
 	return &TMDbApi{
-		api:    tmdb.Init(tmdb.Config{APIKey: apiKey, Proxies: nil, UseProxy: false}),
+		client: c,
 		opts:   opts,
 		storer: storer,
 
 		log: log.With("pkg", "api"),
-	}
+	}, nil
 }
 
 func (api *TMDbApi) GetMoviesRecomendations(ctx context.Context, movies types.ContentSlice) (types.ContentSlice, error) {
 	log := api.log.With("fn", "getMoviesRecomendation")
 	contents := make(types.ContentSlice, 0)
 	for _, m := range movies {
-		recs, err := api.api.GetMovieRecommendations(int(m.ID), api.opts)
+		recs, err := api.client.GetMovieRecommendations(int(m.ID), api.opts)
 		if err != nil {
 			log.Error("failed to get movie recomendations", "err", err.Error())
 			return contents, err
@@ -69,7 +75,7 @@ func (api *TMDbApi) GetTVsRecomendations(ctx context.Context, tvs types.ContentS
 	log := api.log.With("fn", "getTVsRecomendation")
 	contents := make(types.ContentSlice, 0)
 	for _, m := range tvs {
-		recs, err := api.api.GetTvRecommendations(int(m.ID), api.opts)
+		recs, err := api.client.GetTVRecommendations(int(m.ID), api.opts)
 		if err != nil {
 			log.Error("failed to get tvs recomendations", "err", err.Error())
 			return contents, err

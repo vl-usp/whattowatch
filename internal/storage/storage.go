@@ -16,7 +16,7 @@ type ContentStorer interface {
 
 type GenreStorer interface {
 	GetGenres(ctx context.Context, contentID int64) (types.Genres, error)
-	GetGenresByIDs(ctx context.Context, ids []int) (types.Genres, error)
+	GetGenresByIDs(ctx context.Context, ids []int64) (types.Genres, error)
 	InsertGenres(ctx context.Context, genres types.Genres) error
 	InsertContentGenres(ctx context.Context, contentID int64, tmdbGenreIDs []int64) error
 }

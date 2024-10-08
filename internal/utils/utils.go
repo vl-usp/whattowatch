@@ -34,7 +34,7 @@ func EscapeString(s string) string {
 
 func ParseCommand(s string) (string, []string, error) {
 	if s[0] != '/' {
-		return "", nil, fmt.Errorf("command %s should be started with '/': %s", s)
+		return "", nil, fmt.Errorf("command %s should be started with '/': %s", s, s)
 	}
 	arr := strings.SplitN(s, " ", 2)
 	if len(arr) < 2 {

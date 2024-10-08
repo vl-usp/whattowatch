@@ -22,9 +22,14 @@ type TGBot struct {
 }
 
 func NewTGBot(cfg *config.Config, log *slog.Logger, storer storage.Storer) (*TGBot, error) {
+	api, err := api.New(cfg.Tokens.TMDb, storer, log)
+	if err != nil {
+		return nil, err
+	}
+
 	tgbot := &TGBot{
 		storer: storer,
-		api:    api.New(cfg.Tokens.TMDb, storer, log),
+		api:    api,
 
 		log: log.With("pkg", "botkit"),
 		cfg: cfg,
