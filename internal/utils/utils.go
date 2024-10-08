@@ -43,10 +43,10 @@ func ParseCommand(s string) (string, []string, error) {
 	return arr[0], strings.Split(arr[1], ", "), nil
 }
 
-func MapToSlice[K comparable](m map[K]struct{}) []K {
-	res := make([]K, 0, len(m))
-	for k := range m {
-		res = append(res, k)
+func MapToSlice[K comparable, V any](m map[K]V) []V {
+	s := make([]V, 0, len(m))
+	for _, v := range m {
+		s = append(s, v)
 	}
-	return res
+	return s
 }

@@ -13,19 +13,14 @@ import (
 
 type ContentStorer interface {
 	GetContent(ctx context.Context, id uuid.UUID) (types.Content, error)
-	GetContentTMDbIDs(ctx context.Context) ([]uuid.UUID, error)
-	GetContentByTitles(ctx context.Context, titles []string) (types.Contents, error)
-	InsertContent(ctx context.Context, content types.Content) error
-	InsertContents(ctx context.Context, contents types.Contents) error
-	UpdateContent(ctx context.Context, content types.Content) error
+	InsertContentSlice(ctx context.Context, contents types.ContentSlice) error
 }
 
 type GenreStorer interface {
 	GetGenres(ctx context.Context, contentID uuid.UUID) (types.Genres, error)
 	GetGenresByIDs(ctx context.Context, ids []int) (types.Genres, error)
-	InsertGenre(ctx context.Context, genre types.Genre) error
 	InsertGenres(ctx context.Context, genres types.Genres) error
-	InsertContentGenres(ctx context.Context, contentID uuid.UUID, tmdbGenreIDs []int32) error
+	InsertContentGenres(ctx context.Context, contentID uuid.UUID, tmdbGenreIDs []int64) error
 }
 
 type UserStorer interface {

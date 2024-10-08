@@ -32,11 +32,11 @@ func New(apiKey string, storer storage.Storer, log *slog.Logger) *TMDbApi {
 	}
 }
 
-func (api *TMDbApi) GetMoviesRecomendations(ctx context.Context, movies types.Contents) (types.Contents, error) {
+func (api *TMDbApi) GetMoviesRecomendations(ctx context.Context, movies types.ContentSlice) (types.ContentSlice, error) {
 	log := api.log.With("fn", "getMoviesRecomendation")
-	contents := make(types.Contents, 0)
+	contents := make(types.ContentSlice, 0)
 	for _, m := range movies {
-		recs, err := api.api.GetMovieRecommendations(m.TMDbID, api.opts)
+		recs, err := api.api.GetMovieRecommendations(int(m.TMDbID), api.opts)
 		if err != nil {
 			log.Error("failed to get movie recomendations", "err", err.Error())
 			return contents, err
@@ -55,7 +55,7 @@ func (api *TMDbApi) GetMoviesRecomendations(ctx context.Context, movies types.Co
 			}
 			contents = append(contents, types.Content{
 				ID:          uuid.Nil,
-				TMDbID:      rec.ID,
+				TMDbID:      int64(rec.ID),
 				Title:       rec.Title,
 				Genres:      genres,
 				Overview:    rec.Overview,
@@ -67,11 +67,11 @@ func (api *TMDbApi) GetMoviesRecomendations(ctx context.Context, movies types.Co
 	return contents, nil
 }
 
-func (api *TMDbApi) GetTVsRecomendations(ctx context.Context, tvs types.Contents) (types.Contents, error) {
+func (api *TMDbApi) GetTVsRecomendations(ctx context.Context, tvs types.ContentSlice) (types.ContentSlice, error) {
 	log := api.log.With("fn", "getTVsRecomendation")
-	contents := make(types.Contents, 0)
+	contents := make(types.ContentSlice, 0)
 	for _, m := range tvs {
-		recs, err := api.api.GetTvRecommendations(m.TMDbID, api.opts)
+		recs, err := api.api.GetTvRecommendations(int(m.TMDbID), api.opts)
 		if err != nil {
 			log.Error("failed to get tvs recomendations", "err", err.Error())
 			return contents, err
@@ -90,7 +90,7 @@ func (api *TMDbApi) GetTVsRecomendations(ctx context.Context, tvs types.Contents
 			}
 			contents = append(contents, types.Content{
 				ID:          uuid.Nil,
-				TMDbID:      rec.ID,
+				TMDbID:      int64(rec.ID),
 				Title:       rec.Name,
 				Genres:      genres,
 				Overview:    rec.Overview,
@@ -102,6 +102,6 @@ func (api *TMDbApi) GetTVsRecomendations(ctx context.Context, tvs types.Contents
 	return contents, nil
 }
 
-func (api *TMDbApi) GetTopMovies(ctx context.Context) (types.Contents, error) {
+func (api *TMDbApi) GetTopMovies(ctx context.Context) (types.ContentSlice, error) {
 	return nil, nil
 }

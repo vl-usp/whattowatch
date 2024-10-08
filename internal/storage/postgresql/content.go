@@ -3,6 +3,7 @@ package postgresql
 import (
 	"context"
 	"fmt"
+	"strings"
 	"whattowatch/internal/types"
 
 	sq "github.com/Masterminds/squirrel"
@@ -18,7 +19,7 @@ func (pg *PostgreSQL) GetContent(ctx context.Context, id uuid.UUID) (types.Conte
 	err = pg.pool.QueryRow(ctx, sql, args...).Scan(
 		&fc.ID,
 		&fc.TMDbID,
-		&fc.ContentTypeID,
+		&fc.ContentType,
 		&fc.Title,
 		&fc.Overview,
 		&fc.Popularity,
@@ -33,113 +34,7 @@ func (pg *PostgreSQL) GetContent(ctx context.Context, id uuid.UUID) (types.Conte
 	return fc, nil
 }
 
-func (pg *PostgreSQL) GetContentTMDbIDs(ctx context.Context) ([]uuid.UUID, error) {
-	sql, args, err := sq.Select("tmdb_id").PlaceholderFormat(sq.Dollar).From("content").ToSql()
-	if err != nil {
-		return nil, err
-	}
-	ids := make([]uuid.UUID, 0)
-	r, err := pg.pool.Query(ctx, sql, args...)
-	if err != nil {
-		return ids, fmt.Errorf("failed to get ids: %s", err.Error())
-	}
-	for r.Next() {
-		var id uuid.UUID
-		err = r.Scan(&id)
-		if err != nil {
-			return ids, fmt.Errorf("failed to scan: %s", err.Error())
-		}
-		ids = append(ids, id)
-	}
-	r.Close()
-	return ids, nil
-}
-
-func (pg *PostgreSQL) GetContentByTitles(ctx context.Context, titles []string) (types.Contents, error) {
-	builder := sq.Select("*").PlaceholderFormat(sq.Dollar).From("content")
-	sql, args, err := builder.Where("title = any(?)", titles).ToSql()
-	if err != nil {
-		return nil, err
-	}
-
-	rows, err := pg.pool.Query(ctx, sql, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	contentData := make(types.Contents, 0, len(rows.RawValues()))
-
-	for rows.Next() {
-		var content types.Content
-		err = rows.Scan(
-			&content.ID,
-			&content.TMDbID,
-			&content.ContentTypeID,
-			&content.Title,
-			&content.Overview,
-			&content.Popularity,
-			&content.PosterPath,
-			&content.ReleaseDate,
-			&content.VoteAverage,
-			&content.VoteCount,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan movie from db: %s", err.Error())
-		}
-		contentData = append(contentData, content)
-	}
-
-	return contentData, nil
-}
-
-func (pg *PostgreSQL) InsertContent(ctx context.Context, content types.Content) error {
-	sql1, args1, err := sq.Insert("content").SetMap(sq.Eq{
-		"id":              content.ID,
-		"content_type_id": content.ContentTypeID,
-		"title":           content.Title,
-		"overview":        content.Overview,
-		"popularity":      content.Popularity,
-		"poster_path":     content.PosterPath,
-		"release_date":    content.ReleaseDate,
-		"vote_average":    content.VoteAverage,
-		"vote_count":      content.VoteCount,
-	}).PlaceholderFormat(sq.Dollar).ToSql()
-	if err != nil {
-		return fmt.Errorf("failed to build insert query: %s", err.Error())
-	}
-
-	sql2, args2, err := sq.Insert("link_tmdb_contents").SetMap(sq.Eq{
-		"content_id": content.ID,
-		"tmdb_id":    content.TMDbID,
-	}).PlaceholderFormat(sq.Dollar).ToSql()
-	if err != nil {
-		return fmt.Errorf("failed to build insert query: %s", err.Error())
-	}
-
-	tx, err := pg.pool.Begin(ctx)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback(ctx)
-
-	_, err = pg.pool.Exec(ctx, sql1, args1...)
-	if err != nil {
-		return fmt.Errorf("failed to insert content: %s, %v", err.Error(), content)
-	}
-
-	_, err = pg.pool.Exec(ctx, sql2, args2...)
-	if err != nil {
-		return fmt.Errorf("failed to insert content: %s, %v", err.Error(), content)
-	}
-
-	err = tx.Commit(ctx)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (pg *PostgreSQL) InsertContents(ctx context.Context, contents types.Contents) error {
+func (pg *PostgreSQL) InsertContentSlice(ctx context.Context, contents types.ContentSlice) error {
 	builder := sq.Insert("content").Columns(
 		"id",
 		"content_type_id",
@@ -155,7 +50,7 @@ func (pg *PostgreSQL) InsertContents(ctx context.Context, contents types.Content
 	for _, c := range contents {
 		builder = builder.Values(
 			c.ID,
-			c.ContentTypeID,
+			c.ContentType.EnumIndex(),
 			c.Title,
 			c.Overview,
 			c.Popularity,
@@ -168,16 +63,26 @@ func (pg *PostgreSQL) InsertContents(ctx context.Context, contents types.Content
 
 	sql1, args1, err := builder.Suffix("ON CONFLICT DO NOTHING").ToSql()
 	if err != nil {
-		return fmt.Errorf("failed to build insert query: %s", err.Error())
+		return fmt.Errorf("failed to build insert content query: %s", err.Error())
 	}
 
-	builder = sq.Insert("link_tmdb_contents").Columns("content_id", "tmdb_id")
+	valueStrings := make([]string, 0, len(contents))
 	for _, c := range contents {
-		builder = builder.Values(c.ID, c.TMDbID)
+		valueStrings = append(valueStrings, fmt.Sprintf("('%s'::uuid, %d)", c.ID, c.TMDbID))
 	}
-	sql2, args2, err := builder.Suffix("ON CONFLICT DO NOTHING").ToSql()
+
+	valuesSelect := sq.Select("t1.content_id", "t1.tmdb_content_id").
+		From(fmt.Sprintf("(VALUES %s) AS t1(content_id, tmdb_content_id)", strings.Join(valueStrings, ", "))).
+		Where("NOT EXISTS (SELECT 1 FROM link_tmdb_content t2 WHERE t2.tmdb_content_id = t1.tmdb_content_id)")
+
+	sb := sq.Insert("link_tmdb_content").
+		Columns("content_id", "tmdb_content_id").
+		Select(valuesSelect).
+		Suffix("ON CONFLICT DO NOTHING")
+
+	sql2, args2, err := sb.ToSql()
 	if err != nil {
-		return fmt.Errorf("failed to build insert query: %s", err.Error())
+		return fmt.Errorf("failed to build insert link_tmdb_content query: %s", err.Error())
 	}
 
 	tx, err := pg.pool.Begin(ctx)
@@ -188,12 +93,12 @@ func (pg *PostgreSQL) InsertContents(ctx context.Context, contents types.Content
 
 	_, err = pg.pool.Exec(ctx, sql1, args1...)
 	if err != nil {
-		return fmt.Errorf("failed to insert film content: %s", err.Error())
+		return fmt.Errorf("failed to insert content: %s", err.Error())
 	}
 
 	_, err = pg.pool.Exec(ctx, sql2, args2...)
 	if err != nil {
-		return fmt.Errorf("failed to insert film content: %s", err.Error())
+		return fmt.Errorf("failed to insert tmdb link content: %s", err.Error())
 	}
 
 	err = tx.Commit(ctx)
@@ -201,24 +106,5 @@ func (pg *PostgreSQL) InsertContents(ctx context.Context, contents types.Content
 		return err
 	}
 
-	return nil
-}
-
-func (pg *PostgreSQL) UpdateContent(ctx context.Context, movie types.Content) error {
-	sql, args, err := sq.Update("content").SetMap(sq.Eq{
-		"popularity":   movie.Popularity,
-		"poster_path":  movie.PosterPath,
-		"release_date": movie.ReleaseDate,
-		"vote_average": movie.VoteAverage,
-		"vote_count":   movie.VoteCount,
-	}).Where(sq.Eq{"id": movie.ID}).PlaceholderFormat(sq.Dollar).ToSql()
-
-	if err != nil {
-		return fmt.Errorf("failed to build update query: %s", err.Error())
-	}
-	_, err = pg.pool.Exec(ctx, sql, args...)
-	if err != nil {
-		return fmt.Errorf("failed to update tmdb content: %s", err.Error())
-	}
 	return nil
 }

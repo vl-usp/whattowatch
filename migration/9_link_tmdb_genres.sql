@@ -11,5 +11,5 @@ create table if not exists public.link_tmdb_genres (
 
 -- +goose Down
 -- +goose StatementBegin
-drop table if exists public.tmdb_content;
+drop table if exists public.link_tmdb_genres;
 -- +goose StatementEnd

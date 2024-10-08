@@ -10,7 +10,7 @@ type Genre struct {
 	ID         uuid.UUID
 	Name       string
 	PrettyName string
-	TMDbID     int
+	TMDbID     int64
 }
 
 type Genres []Genre

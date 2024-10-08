@@ -29,6 +29,9 @@ migration-up:
 
 migration-down:
 	$(LOCAL_BIN)/goose -dir $(MIGRATION_DIR) postgres $(POSTGRES_DSN) down -v
+	
+migration-down-all:
+	$(LOCAL_BIN)/goose -dir $(MIGRATION_DIR) postgres $(POSTGRES_DSN) down-to 0 -v
 
 docker-up:
 	mkdir -p .tmp

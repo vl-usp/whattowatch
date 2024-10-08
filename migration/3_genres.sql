@@ -2,7 +2,7 @@
 -- +goose StatementBegin
 create table if not exists public.genres (
 	id uuid primary key,
-	name text not null,
+	name text unique not null,
 	pretty_name text
 );
 -- +goose StatementEnd

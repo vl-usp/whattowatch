@@ -12,5 +12,5 @@ create table if not exists public.link_content_genres (
 
 -- +goose Down
 -- +goose StatementBegin
-drop table if exists public.content_genres;
+drop table if exists public.link_content_genres;
 -- +goose StatementEnd

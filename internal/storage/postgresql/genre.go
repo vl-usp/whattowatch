@@ -3,6 +3,7 @@ package postgresql
 import (
 	"context"
 	"fmt"
+	"strings"
 	"whattowatch/internal/types"
 
 	sq "github.com/Masterminds/squirrel"
@@ -10,18 +11,22 @@ import (
 )
 
 func (pg *PostgreSQL) GetGenres(ctx context.Context, contentID uuid.UUID) (types.Genres, error) {
-	sql, args, err := sq.Select("genres.id", "genres.tmdb_id", "genres.name", "genres.slug", "genres.formatted_name").
-		From("genres").
-		Join("content_genres ON genres.id = content_genres.genre_id").
-		Where("content_genres.content_id = ?", contentID).PlaceholderFormat(sq.Dollar).ToSql()
+	sql, args, err := sq.Select("t1.id", "t2.tmdb_genre_id", "t1.name", "t1.pretty_name").
+		From("genres t1").
+		Join("link_tmdb_genres t2 ON t1.id = t2.genre_id").
+		Join("link_content_genres t3 on t1.id = t3.genre_id").
+		Where("t3.content_id = ?", contentID).PlaceholderFormat(sq.Dollar).ToSql()
 	if err != nil {
 		return nil, err
 	}
+
 	rows, err := pg.pool.Query(ctx, sql, args...)
 	if err != nil {
 		return nil, err
 	}
+
 	defer rows.Close()
+
 	genres := make(types.Genres, 0)
 	for rows.Next() {
 		genre := types.Genre{}
@@ -31,21 +36,26 @@ func (pg *PostgreSQL) GetGenres(ctx context.Context, contentID uuid.UUID) (types
 		}
 		genres = append(genres, genre)
 	}
+
 	return genres, nil
 }
 
 func (pg *PostgreSQL) GetGenresByIDs(ctx context.Context, ids []int) (types.Genres, error) {
-	sql, args, err := sq.Select("id", "tmdb_id", "name", "pretty_name").
-		From("genres").
-		Where("tmdb_id = any(?)", ids).PlaceholderFormat(sq.Dollar).ToSql()
+	sql, args, err := sq.Select("t1.id", "t2.tmdb_genre_id", "t1.name", "t1.pretty_name").
+		From("genres t1").
+		Join("link_tmdb_genres t2 on t1.id = t2.genre_id").
+		Where("t2.tmdb_genre_id = any(?)", ids).PlaceholderFormat(sq.Dollar).ToSql()
 	if err != nil {
 		return nil, err
 	}
+
 	rows, err := pg.pool.Query(ctx, sql, args...)
 	if err != nil {
 		return nil, err
 	}
+
 	defer rows.Close()
+
 	genres := make(types.Genres, 0)
 	for rows.Next() {
 		genre := types.Genre{}
@@ -55,22 +65,35 @@ func (pg *PostgreSQL) GetGenresByIDs(ctx context.Context, ids []int) (types.Genr
 		}
 		genres = append(genres, genre)
 	}
+
 	return genres, nil
 }
 
-func (pg *PostgreSQL) InsertGenre(ctx context.Context, genre types.Genre) error {
-	sql1, args1, err := sq.Insert("genres").
-		Columns("id", "name").
-		Values(genre.ID, genre.Name).
-		PlaceholderFormat(sq.Dollar).Suffix("ON CONFLICT DO NOTHING").ToSql()
+func (pg *PostgreSQL) InsertGenres(ctx context.Context, genres types.Genres) error {
+	genreBuilder := sq.Insert("genres").Columns("id", "name")
+	for _, genre := range genres {
+		genreBuilder = genreBuilder.Values(genre.ID, genre.Name)
+	}
+	sql1, args1, err := genreBuilder.PlaceholderFormat(sq.Dollar).Suffix("ON CONFLICT DO NOTHING").ToSql()
 	if err != nil {
 		return err
 	}
 
-	sql2, args2, err := sq.Insert("link_tmdb_genres").
+	valueStrings := make([]string, 0, len(genres))
+	for _, genre := range genres {
+		valueStrings = append(valueStrings, fmt.Sprintf("('%s'::uuid, %d)", genre.ID, genre.TMDbID))
+	}
+
+	valuesSelect := sq.Select("t1.genre_id", "t1.tmdb_genre_id").
+		From(fmt.Sprintf("(VALUES %s) AS t1(genre_id, tmdb_genre_id)", strings.Join(valueStrings, ", "))).
+		Where("NOT EXISTS (SELECT 1 FROM link_tmdb_genres t2 WHERE t2.tmdb_genre_id = t1.tmdb_genre_id)")
+
+	sb := sq.Insert("link_tmdb_genres").
 		Columns("genre_id", "tmdb_genre_id").
-		Values(genre.ID, genre.TMDbID).
-		PlaceholderFormat(sq.Dollar).Suffix("ON CONFLICT DO NOTHING").ToSql()
+		Select(valuesSelect).
+		Suffix("ON CONFLICT DO NOTHING")
+
+	sql2, args2, err := sb.ToSql()
 	if err != nil {
 		return err
 	}
@@ -83,12 +106,12 @@ func (pg *PostgreSQL) InsertGenre(ctx context.Context, genre types.Genre) error 
 
 	_, err = pg.pool.Exec(ctx, sql1, args1...)
 	if err != nil {
-		return fmt.Errorf("failed to insert film genre: %s", err.Error())
+		return fmt.Errorf("failed to insert genre: %s", err.Error())
 	}
 
 	_, err = pg.pool.Exec(ctx, sql2, args2...)
 	if err != nil {
-		return fmt.Errorf("failed to insert film genre: %s", err.Error())
+		return fmt.Errorf("failed to insert link tmdb genre: %s", err.Error())
 	}
 
 	err = tx.Commit(ctx)
@@ -99,7 +122,7 @@ func (pg *PostgreSQL) InsertGenre(ctx context.Context, genre types.Genre) error 
 	return nil
 }
 
-func (pg *PostgreSQL) InsertContentGenres(ctx context.Context, contentID uuid.UUID, tmdbGenreIDs []int32) error {
+func (pg *PostgreSQL) InsertContentGenres(ctx context.Context, contentID uuid.UUID, tmdbGenreIDs []int64) error {
 	if len(tmdbGenreIDs) == 0 {
 		return nil
 	}
@@ -135,51 +158,11 @@ func (pg *PostgreSQL) InsertContentGenres(ctx context.Context, contentID uuid.UU
 	return nil
 }
 
-func (pg *PostgreSQL) InsertGenres(ctx context.Context, genres types.Genres) error {
-	builder := sq.Insert("genres").Columns("id", "tmdb_id", "name")
-	for _, genre := range genres {
-		builder = builder.Values(genre.ID, genre.TMDbID, genre.Name)
-	}
-	sql1, args1, err := builder.PlaceholderFormat(sq.Dollar).Suffix("ON CONFLICT DO NOTHING").ToSql()
-	if err != nil {
-		return err
-	}
-
-	builder = sq.Insert("link_tmdb_genres").Columns("genre_id", "tmdb_genre_id")
-	for _, genre := range genres {
-		builder = builder.Values(genre.ID, genre.TMDbID)
-	}
-	sql2, args2, err := builder.PlaceholderFormat(sq.Dollar).Suffix("ON CONFLICT DO NOTHING").ToSql()
-	if err != nil {
-		return err
-	}
-
-	tx, err := pg.pool.Begin(ctx)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback(ctx)
-
-	_, err = pg.pool.Exec(ctx, sql1, args1...)
-	if err != nil {
-		return fmt.Errorf("failed to insert film genre: %s", err.Error())
-	}
-
-	_, err = pg.pool.Exec(ctx, sql2, args2...)
-	if err != nil {
-		return fmt.Errorf("failed to insert film genre: %s", err.Error())
-	}
-
-	err = tx.Commit(ctx)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (pg *PostgreSQL) getGenreUUIDsByTMDBIDs(ctx context.Context, tmdbGenreIDs []int32) ([]uuid.UUID, error) {
-	sql, args, err := sq.Select("id").From("link_tmdb_genres").Where("tmdb_genre_id = any(?)", tmdbGenreIDs).PlaceholderFormat(sq.Dollar).ToSql()
+func (pg *PostgreSQL) getGenreUUIDsByTMDBIDs(ctx context.Context, tmdbGenreIDs []int64) ([]uuid.UUID, error) {
+	sql, args, err := sq.Select("genre_id").
+		From("link_tmdb_genres").
+		Where("tmdb_genre_id = any(?)", tmdbGenreIDs).
+		PlaceholderFormat(sq.Dollar).ToSql()
 	if err != nil {
 		return nil, err
 	}

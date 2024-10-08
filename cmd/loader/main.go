@@ -2,6 +2,10 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"io"
+	"net/http"
+	"os/exec"
 	"whattowatch/internal/config"
 	"whattowatch/internal/services/loader"
 	"whattowatch/internal/storage"
@@ -9,6 +13,9 @@ import (
 )
 
 func main() {
+	printIP()
+	// printData()
+
 	cfg := config.MustLoad()
 
 	log, file := logger.SetupLogger(cfg.Env, cfg.LogDir+"/loader")
@@ -18,7 +25,7 @@ func main() {
 	if err != nil {
 		log.Error("creating a storage error", "error", err.Error())
 	}
-	loader, err := loader.NewTMDbLoader(cfg.Tokens.TMDb, cfg.Urls.TMDbApiUrl, log, storer)
+	loader, err := loader.NewTMDbLoader(cfg, log, storer)
 	if err != nil {
 		log.Error("creating a loader error", "error", err.Error())
 	}
@@ -29,4 +36,38 @@ func main() {
 	if err != nil {
 		log.Error("load error", "error", err.Error())
 	}
+}
+
+func printIP() {
+	app := "wget"
+
+	arg0 := "-qO-"
+	arg1 := "eth0.me"
+
+	cmd := exec.Command(app, arg0, arg1)
+	stdout, err := cmd.Output()
+
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+
+	// Print the output
+	fmt.Println("current IP is " + string(stdout))
+}
+
+func printData() {
+	resp, err := http.Get("https://api.themoviedb.org/3/movie/11?api_key=12ea487afaad527386fc29d0b058cdbd")
+	if err != nil {
+		// handle err
+	}
+	defer resp.Body.Close()
+
+	// Print the output
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+	bodyString := string(bodyBytes)
+	fmt.Println(bodyString)
 }
