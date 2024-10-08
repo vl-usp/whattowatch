@@ -2,15 +2,12 @@ package types
 
 import (
 	"strings"
-
-	"github.com/gofrs/uuid"
 )
 
 type Genre struct {
-	ID         uuid.UUID
+	ID         int64
 	Name       string
 	PrettyName string
-	TMDbID     int64
 }
 
 type Genres []Genre

@@ -8,7 +8,6 @@ import (
 	"whattowatch/internal/storage"
 	"whattowatch/internal/types"
 
-	"github.com/gofrs/uuid"
 	"github.com/ryanbradynd05/go-tmdb"
 )
 
@@ -36,7 +35,7 @@ func (api *TMDbApi) GetMoviesRecomendations(ctx context.Context, movies types.Co
 	log := api.log.With("fn", "getMoviesRecomendation")
 	contents := make(types.ContentSlice, 0)
 	for _, m := range movies {
-		recs, err := api.api.GetMovieRecommendations(int(m.TMDbID), api.opts)
+		recs, err := api.api.GetMovieRecommendations(int(m.ID), api.opts)
 		if err != nil {
 			log.Error("failed to get movie recomendations", "err", err.Error())
 			return contents, err
@@ -54,8 +53,7 @@ func (api *TMDbApi) GetMoviesRecomendations(ctx context.Context, movies types.Co
 				return contents, err
 			}
 			contents = append(contents, types.Content{
-				ID:          uuid.Nil,
-				TMDbID:      int64(rec.ID),
+				ID:          int64(rec.ID),
 				Title:       rec.Title,
 				Genres:      genres,
 				Overview:    rec.Overview,
@@ -71,7 +69,7 @@ func (api *TMDbApi) GetTVsRecomendations(ctx context.Context, tvs types.ContentS
 	log := api.log.With("fn", "getTVsRecomendation")
 	contents := make(types.ContentSlice, 0)
 	for _, m := range tvs {
-		recs, err := api.api.GetTvRecommendations(int(m.TMDbID), api.opts)
+		recs, err := api.api.GetTvRecommendations(int(m.ID), api.opts)
 		if err != nil {
 			log.Error("failed to get tvs recomendations", "err", err.Error())
 			return contents, err
@@ -89,8 +87,7 @@ func (api *TMDbApi) GetTVsRecomendations(ctx context.Context, tvs types.ContentS
 				return contents, err
 			}
 			contents = append(contents, types.Content{
-				ID:          uuid.Nil,
-				TMDbID:      int64(rec.ID),
+				ID:          int64(rec.ID),
 				Title:       rec.Name,
 				Genres:      genres,
 				Overview:    rec.Overview,

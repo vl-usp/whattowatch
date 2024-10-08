@@ -1,9 +1,9 @@
 -- +goose Up
 -- +goose StatementBegin
 create table if not exists public.content (
-	id uuid primary key,
+	id int primary key,
 	content_type_id int not null,
-	title text not null,
+	title text unique not null,
 	overview text,
 	popularity numeric,
 	poster_path text,

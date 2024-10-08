@@ -11,7 +11,6 @@ import (
 	"whattowatch/internal/utils"
 
 	tmdbLib "github.com/cyruzin/golang-tmdb"
-	"github.com/gofrs/uuid"
 )
 
 type Storer interface {
@@ -101,12 +100,7 @@ func (l *TMDbLoader) loadGenres(ctx context.Context) error {
 	genres := make(map[int64]types.Genre, len(movieGenres.Genres))
 
 	for _, genre := range movieGenres.Genres {
-		id, err := uuid.NewV4()
-		if err != nil {
-			l.log.Error("failed to generate movie genre uuid", "error", err.Error())
-			return err
-		}
-		genres[genre.ID] = types.Genre{ID: id, TMDbID: genre.ID, Name: genre.Name}
+		genres[genre.ID] = types.Genre{ID: genre.ID, Name: genre.Name}
 	}
 
 	tvGenres, err := l.client.GetGenreTVList(l.options)
@@ -115,12 +109,7 @@ func (l *TMDbLoader) loadGenres(ctx context.Context) error {
 	}
 
 	for _, genre := range tvGenres.Genres {
-		id, err := uuid.NewV4()
-		if err != nil {
-			l.log.Error("failed to generate tv genre uuid", "error", err.Error())
-			return err
-		}
-		genres[genre.ID] = types.Genre{ID: id, TMDbID: genre.ID, Name: genre.Name}
+		genres[genre.ID] = types.Genre{ID: genre.ID, Name: genre.Name}
 	}
 
 	l.log.Debug("genres insertion", "movies", movieGenres.Genres, "tvs", tvGenres.Genres, "total", genres)
@@ -135,7 +124,7 @@ func (l *TMDbLoader) loadGenres(ctx context.Context) error {
 
 func (l *TMDbLoader) discoverAndSave(ctx context.Context, dt types.ContentType) error {
 	fromPage := 1
-	toPage := 500
+	toPage := 1000
 	for page := fromPage; page <= toPage; page++ {
 		l.options["page"] = fmt.Sprintf("%d", page)
 
@@ -148,20 +137,15 @@ func (l *TMDbLoader) discoverAndSave(ctx context.Context, dt types.ContentType) 
 			}
 			l.log.Info("discover movies success", "page", page, "total_pages", res.TotalPages, "total_results", res.TotalResults)
 			movies := make(types.ContentSlice, 0, len(res.Results))
-			moviesGenresMap := make(map[uuid.UUID][]int64, len(res.Results))
+			moviesGenresMap := make(map[int64][]int64, len(res.Results))
 			for _, movie := range res.Results {
 				releaseDate, err := types.GetReleaseDate(movie.ReleaseDate)
 				if err != nil {
 					l.log.Error("failed to get release date", "error", err.Error())
 				}
 
-				movieUUID, err := uuid.NewV4()
-				if err != nil {
-					l.log.Error("failed to generate movie uuid", "error", err.Error())
-					return err
-				}
 				movies = append(movies, types.Content{
-					ID:          movieUUID,
+					ID:          movie.ID,
 					ContentType: dt,
 					Title:       movie.Title,
 					Overview:    movie.Overview,
@@ -170,10 +154,9 @@ func (l *TMDbLoader) discoverAndSave(ctx context.Context, dt types.ContentType) 
 					ReleaseDate: releaseDate,
 					VoteAverage: movie.VoteAverage,
 					VoteCount:   movie.VoteCount,
-					TMDbID:      movie.ID,
 				})
 
-				moviesGenresMap[movieUUID] = movie.GenreIDs
+				moviesGenresMap[movie.ID] = movie.GenreIDs
 			}
 
 			err = l.storer.InsertContentSlice(ctx, movies)
@@ -197,7 +180,7 @@ func (l *TMDbLoader) discoverAndSave(ctx context.Context, dt types.ContentType) 
 			}
 			l.log.Info("discover TVs success", "page", page, "total_pages", res.TotalPages, "total_results", res.TotalResults)
 			tvs := make(types.ContentSlice, 0, len(res.Results))
-			tvsGenresMap := make(map[uuid.UUID][]int64, len(res.Results))
+			tvsGenresMap := make(map[int64][]int64, len(res.Results))
 			for _, tv := range res.Results {
 				tvTitle := tv.Name
 				if tv.Name == "" {
@@ -209,14 +192,8 @@ func (l *TMDbLoader) discoverAndSave(ctx context.Context, dt types.ContentType) 
 					l.log.Error("failed to get release date", "error", err.Error())
 				}
 
-				tvUUID, err := uuid.NewV4()
-				if err != nil {
-					l.log.Error("failed to generate movie uuid", "error", err.Error())
-					return err
-				}
 				tvs = append(tvs, types.Content{
-					ID:          tvUUID,
-					TMDbID:      tv.ID,
+					ID:          tv.ID,
 					ContentType: dt,
 					Title:       tvTitle,
 					Overview:    tv.Overview,
@@ -226,7 +203,7 @@ func (l *TMDbLoader) discoverAndSave(ctx context.Context, dt types.ContentType) 
 					VoteAverage: tv.VoteAverage,
 					VoteCount:   tv.VoteCount,
 				})
-				tvsGenresMap[tvUUID] = tv.GenreIDs
+				tvsGenresMap[tv.ID] = tv.GenreIDs
 			}
 
 			err = l.storer.InsertContentSlice(ctx, tvs)

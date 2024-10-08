@@ -5,12 +5,10 @@ import (
 	"fmt"
 	"strings"
 	"time"
-
-	"github.com/gofrs/uuid"
 )
 
 type Content struct {
-	ID          uuid.UUID
+	ID          int64
 	ContentType ContentType
 	Title       string
 	Overview    string
@@ -20,7 +18,6 @@ type Content struct {
 	VoteAverage float32
 	VoteCount   int64
 	Genres      Genres
-	TMDbID      int64
 }
 
 func GetReleaseDate(in string) (sql.NullTime, error) {
@@ -33,10 +30,10 @@ func GetReleaseDate(in string) (sql.NullTime, error) {
 
 type ContentSlice []Content
 
-func (cs ContentSlice) IDs() []uuid.UUID {
-	res := make([]uuid.UUID, 0, len(cs))
-	for _, movie := range cs {
-		res = append(res, movie.ID)
+func (cs ContentSlice) IDs() []int64 {
+	res := make([]int64, 0, len(cs))
+	for _, c := range cs {
+		res = append(res, c.ID)
 	}
 	return res
 }
