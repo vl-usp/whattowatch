@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
-	"time"
 )
 
 type Content struct {
@@ -20,12 +19,18 @@ type Content struct {
 	Genres      Genres
 }
 
-func GetReleaseDate(in string) (sql.NullTime, error) {
-	relesaseDate, err := time.Parse("2006-01-02", in)
-	if err != nil {
-		return sql.NullTime{}, fmt.Errorf("parse release date from %s error: %s", in, err.Error())
-	}
-	return sql.NullTime{Time: relesaseDate, Valid: true}, nil
+func (c Content) String() string {
+	return fmt.Sprintf(
+		"ID: %d\nНазвание: %s\nЖанры: %s\nДата выхода: %s\nПопулярность: %f\nРейтинг: %f\nКоличество оценок: %d\nОписание: %s\n",
+		c.ID,
+		c.Title,
+		c.Genres.String(),
+		c.ReleaseDate.Time.Format("02.01.2006"),
+		c.Popularity,
+		c.VoteAverage,
+		c.VoteCount,
+		c.Overview,
+	)
 }
 
 type ContentSlice []Content
@@ -59,15 +64,17 @@ func (cs ContentSlice) ContentTitilesMap() map[int][]string {
 	return res
 }
 
-func (cs ContentSlice) PrintByContentType(prefix string) string {
+func (cs ContentSlice) Print(title string) string {
 	builder := strings.Builder{}
+	builder.WriteString(fmt.Sprintf("%s\n", title))
 	for _, c := range cs {
 		switch c.ContentType {
 		case Movie:
-			builder.WriteString(fmt.Sprintf("%s %s\n", prefix+" фильм", c.Title))
+			builder.WriteString("/m")
 		case TV:
-			builder.WriteString(fmt.Sprintf("%s %s\n", prefix+" сериал", c.Title))
+			builder.WriteString("/t")
 		}
+		builder.WriteString(fmt.Sprintf("%d %s (год: %d; популярность: %f; оценка: %f)\n", c.ID, c.Title, c.ReleaseDate.Time.Year(), c.Popularity, c.VoteAverage))
 	}
 	return builder.String()
 }

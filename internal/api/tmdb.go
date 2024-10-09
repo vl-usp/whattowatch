@@ -2,11 +2,12 @@ package api
 
 import (
 	"context"
-	"database/sql"
+	"fmt"
 	"log/slog"
-	"time"
+	"whattowatch/internal/config"
 	"whattowatch/internal/storage"
 	"whattowatch/internal/types"
+	"whattowatch/internal/utils"
 
 	tmdb "github.com/cyruzin/golang-tmdb"
 )
@@ -16,14 +17,15 @@ type TMDbApi struct {
 	opts   map[string]string
 	storer storage.Storer
 
+	cfg *config.Config
 	log *slog.Logger
 }
 
-func New(apiKey string, storer storage.Storer, log *slog.Logger) (*TMDbApi, error) {
+func New(cfg *config.Config, storer storage.Storer, log *slog.Logger) (*TMDbApi, error) {
 	opts := make(map[string]string)
 	opts["language"] = "ru-RU"
 
-	c, err := tmdb.Init(apiKey)
+	c, err := tmdb.Init(cfg.Tokens.TMDb)
 	if err != nil {
 		return nil, err
 	}
@@ -33,78 +35,246 @@ func New(apiKey string, storer storage.Storer, log *slog.Logger) (*TMDbApi, erro
 		opts:   opts,
 		storer: storer,
 
+		cfg: cfg,
 		log: log.With("pkg", "api"),
 	}, nil
 }
 
-func (api *TMDbApi) GetMoviesRecomendations(ctx context.Context, movies types.ContentSlice) (types.ContentSlice, error) {
-	log := api.log.With("fn", "getMoviesRecomendation")
-	contents := make(types.ContentSlice, 0)
-	for _, m := range movies {
-		recs, err := api.client.GetMovieRecommendations(int(m.ID), api.opts)
-		if err != nil {
-			log.Error("failed to get movie recomendations", "err", err.Error())
-			return contents, err
-		}
-
-		for _, rec := range recs.Results {
-			genres, err := api.storer.GetGenresByIDs(ctx, rec.GenreIDs)
-			if err != nil {
-				log.Error("failed to get movie genres", "err", err.Error())
-				return contents, err
-			}
-			releaseDate, err := time.Parse("2006-01-02", rec.ReleaseDate)
-			if err != nil {
-				log.Error("failed to parse release date", "err", err.Error())
-				return contents, err
-			}
-			contents = append(contents, types.Content{
-				ID:          int64(rec.ID),
-				Title:       rec.Title,
-				Genres:      genres,
-				Overview:    rec.Overview,
-				ReleaseDate: sql.NullTime{Time: releaseDate, Valid: true},
-				PosterPath:  rec.PosterPath,
-			})
-		}
+func (a *TMDbApi) GetMovie(ctx context.Context, id int) (types.Content, error) {
+	m, err := a.client.GetMovieDetails(id, a.opts)
+	if err != nil {
+		return types.Content{}, err
 	}
-	return contents, nil
+
+	rd, err := utils.GetReleaseDate(m.ReleaseDate)
+	if err != nil {
+		return types.Content{}, err
+	}
+
+	genres := make(types.Genres, 0, len(m.Genres))
+
+	for _, genre := range m.Genres {
+		genres = append(genres, types.Genre{ID: genre.ID, Name: genre.Name})
+	}
+
+	return types.Content{
+		ID:          m.ID,
+		ContentType: types.Movie,
+		Title:       m.Title,
+		Overview:    m.Overview,
+		Popularity:  m.Popularity,
+		PosterPath:  a.cfg.Urls.TMDbImageUrl + m.PosterPath,
+		ReleaseDate: rd,
+		VoteAverage: m.VoteAverage,
+		VoteCount:   m.VoteCount,
+		Genres:      genres,
+	}, nil
 }
 
-func (api *TMDbApi) GetTVsRecomendations(ctx context.Context, tvs types.ContentSlice) (types.ContentSlice, error) {
-	log := api.log.With("fn", "getTVsRecomendation")
-	contents := make(types.ContentSlice, 0)
-	for _, m := range tvs {
-		recs, err := api.client.GetTVRecommendations(int(m.ID), api.opts)
-		if err != nil {
-			log.Error("failed to get tvs recomendations", "err", err.Error())
-			return contents, err
-		}
-
-		for _, rec := range recs.Results {
-			genres, err := api.storer.GetGenresByIDs(ctx, rec.GenreIDs)
-			if err != nil {
-				log.Error("failed to get tvs genres", "err", err.Error())
-				return contents, err
-			}
-			releaseDate, err := time.Parse("2006-01-02", rec.FirstAirDate)
-			if err != nil {
-				log.Error("failed to parse release date", "err", err.Error())
-				return contents, err
-			}
-			contents = append(contents, types.Content{
-				ID:          int64(rec.ID),
-				Title:       rec.Name,
-				Genres:      genres,
-				Overview:    rec.Overview,
-				ReleaseDate: sql.NullTime{Time: releaseDate, Valid: true},
-				PosterPath:  rec.PosterPath,
-			})
-		}
+func (a *TMDbApi) GetTV(ctx context.Context, id int) (types.Content, error) {
+	m, err := a.client.GetTVDetails(id, a.opts)
+	if err != nil {
+		return types.Content{}, err
 	}
-	return contents, nil
+
+	rd, err := utils.GetReleaseDate(m.FirstAirDate)
+	if err != nil {
+		return types.Content{}, err
+	}
+
+	genres := make(types.Genres, 0, len(m.Genres))
+	for _, genre := range m.Genres {
+		genres = append(genres, types.Genre{ID: genre.ID, Name: genre.Name})
+	}
+
+	return types.Content{
+		ID:          m.ID,
+		ContentType: types.TV,
+		Title:       m.Name,
+		Overview:    m.Overview,
+		Popularity:  m.Popularity,
+		PosterPath:  a.cfg.Urls.TMDbImageUrl + m.PosterPath,
+		ReleaseDate: rd,
+		VoteAverage: m.VoteAverage,
+		VoteCount:   m.VoteCount,
+		Genres:      genres,
+	}, nil
 }
 
-func (api *TMDbApi) GetTopMovies(ctx context.Context) (types.ContentSlice, error) {
-	return nil, nil
+func (a *TMDbApi) GetMoviesPopular(ctx context.Context, page int) (types.ContentSlice, error) {
+	a.opts["page"] = fmt.Sprintf("%d", page)
+	defer delete(a.opts, "page")
+
+	m, err := a.client.GetMoviePopular(a.opts)
+	if err != nil {
+		return nil, err
+	}
+
+	res := make(types.ContentSlice, 0, len(m.MoviePopularResults.Results))
+	for _, v := range m.MoviePopularResults.Results {
+		rd, err := utils.GetReleaseDate(v.ReleaseDate)
+		if err != nil {
+			continue
+		}
+
+		title := v.Title
+		if title == "" {
+			title = v.OriginalTitle
+		}
+
+		genres := make(types.Genres, 0, len(v.Genres))
+		for _, g := range v.Genres {
+			genres = append(genres, types.Genre{
+				ID:   g.ID,
+				Name: g.Name,
+			})
+		}
+
+		res = append(res, types.Content{
+			ID:          v.ID,
+			ContentType: types.Movie,
+			Title:       title,
+			Overview:    v.Overview,
+			Popularity:  v.Popularity,
+			PosterPath:  a.cfg.Urls.TMDbImageUrl + v.PosterPath,
+			ReleaseDate: rd,
+			VoteAverage: v.VoteAverage,
+			VoteCount:   v.VoteCount,
+			Genres:      genres,
+		})
+	}
+
+	return res, nil
+}
+
+func (a *TMDbApi) GetTVPopular(ctx context.Context, page int) (types.ContentSlice, error) {
+	a.opts["page"] = fmt.Sprintf("%d", page)
+	defer delete(a.opts, "page")
+
+	m, err := a.client.GetTVPopular(a.opts)
+	if err != nil {
+		return nil, err
+	}
+
+	res := make(types.ContentSlice, 0, len(m.Results))
+	for _, v := range m.Results {
+		rd, err := utils.GetReleaseDate(v.FirstAirDate)
+		if err != nil {
+			continue
+		}
+
+		title := v.Name
+		if title == "" {
+			title = v.OriginalName
+		}
+
+		genres, err := a.storer.GetGenresByIDs(ctx, v.GenreIDs)
+		if err != nil {
+			return nil, err
+		}
+
+		res = append(res, types.Content{
+			ID:          v.ID,
+			ContentType: types.TV,
+			Title:       title,
+			Overview:    v.Overview,
+			Popularity:  v.Popularity,
+			PosterPath:  a.cfg.Urls.TMDbImageUrl + v.PosterPath,
+			ReleaseDate: rd,
+			VoteAverage: v.VoteAverage,
+			VoteCount:   v.VoteCount,
+			Genres:      genres,
+		})
+	}
+
+	return res, nil
+}
+
+func (a *TMDbApi) GetMovieTop(ctx context.Context, page int) (types.ContentSlice, error) {
+	a.opts["page"] = fmt.Sprintf("%d", page)
+	defer delete(a.opts, "page")
+
+	m, err := a.client.GetMovieTopRated(a.opts)
+	if err != nil {
+		return nil, err
+	}
+
+	res := make(types.ContentSlice, 0, len(m.Results))
+	for _, v := range m.Results {
+		rd, err := utils.GetReleaseDate(v.ReleaseDate)
+		if err != nil {
+			continue
+		}
+
+		title := v.Title
+		if title == "" {
+			title = v.OriginalTitle
+		}
+
+		genres := make(types.Genres, 0, len(v.Genres))
+		for _, g := range v.Genres {
+			genres = append(genres, types.Genre{
+				ID:   g.ID,
+				Name: g.Name,
+			})
+		}
+
+		res = append(res, types.Content{
+			ID:          v.ID,
+			ContentType: types.Movie,
+			Title:       title,
+			Overview:    v.Overview,
+			Popularity:  v.Popularity,
+			PosterPath:  a.cfg.Urls.TMDbImageUrl + v.PosterPath,
+			ReleaseDate: rd,
+			VoteAverage: v.VoteAverage,
+			VoteCount:   v.VoteCount,
+			Genres:      genres,
+		})
+	}
+
+	return res, nil
+}
+
+func (a *TMDbApi) GetTVTop(ctx context.Context, page int) (types.ContentSlice, error) {
+	a.opts["page"] = fmt.Sprintf("%d", page)
+	defer delete(a.opts, "page")
+
+	m, err := a.client.GetTVTopRated(a.opts)
+	if err != nil {
+		return nil, err
+	}
+
+	res := make(types.ContentSlice, 0, len(m.Results))
+	for _, v := range m.Results {
+		rd, err := utils.GetReleaseDate(v.FirstAirDate)
+		if err != nil {
+			continue
+		}
+
+		title := v.Name
+		if title == "" {
+			title = v.OriginalName
+		}
+
+		genres, err := a.storer.GetGenresByIDs(ctx, v.GenreIDs)
+		if err != nil {
+			return nil, err
+		}
+
+		res = append(res, types.Content{
+			ID:          v.ID,
+			ContentType: types.TV,
+			Title:       title,
+			Overview:    v.Overview,
+			Popularity:  v.Popularity,
+			PosterPath:  a.cfg.Urls.TMDbImageUrl + v.PosterPath,
+			ReleaseDate: rd,
+			VoteAverage: v.VoteAverage,
+			VoteCount:   v.VoteCount,
+			Genres:      genres,
+		})
+	}
+
+	return res, nil
 }

@@ -19,10 +19,13 @@ type TGBot struct {
 
 	log *slog.Logger
 	cfg *config.Config
+
+	// TODO keyboard map[user_id]keyboard
+	// TODO pages map[user_id]struct{}
 }
 
 func NewTGBot(cfg *config.Config, log *slog.Logger, storer storage.Storer) (*TGBot, error) {
-	api, err := api.New(cfg.Tokens.TMDb, storer, log)
+	api, err := api.New(cfg, storer, log)
 	if err != nil {
 		return nil, err
 	}
@@ -61,19 +64,18 @@ func (t *TGBot) Start() {
 func (t *TGBot) useHandlers() {
 	t.bot.RegisterHandler(bot.HandlerTypeMessageText, "/help", bot.MatchTypePrefix, t.helpHandler)
 	t.bot.RegisterHandler(bot.HandlerTypeMessageText, "/start", bot.MatchTypePrefix, t.registerHandler)
-	// t.bot.RegisterHandler(bot.HandlerTypeMessageText, "/menu", bot.MatchTypePrefix, t.menuHandler)
+	t.bot.RegisterHandler(bot.HandlerTypeMessageText, "/menu", bot.MatchTypePrefix, t.handlerReplyKeyboard)
 
-	t.bot.RegisterHandler(bot.HandlerTypeMessageText, "/reply_keyboard", bot.MatchTypePrefix, t.handlerReplyKeyboard)
+	// t.bot.RegisterHandler(bot.HandlerTypeMessageText, "/add_favorite", bot.MatchTypePrefix, t.addFavoriteHandler)
+	// t.bot.RegisterHandler(bot.HandlerTypeMessageText, "/remove_favorite", bot.MatchTypePrefix, t.removeFavoriteHandler)
 
-	t.bot.RegisterHandler(bot.HandlerTypeMessageText, "Фильмы", bot.MatchTypeExact, onMoviesKeyboard)
+	// t.bot.RegisterHandler(bot.HandlerTypeMessageText, "/add_viewed", bot.MatchTypePrefix, t.addViewedHandler)
+	// t.bot.RegisterHandler(bot.HandlerTypeMessageText, "/remove_viewed", bot.MatchTypePrefix, t.removeViewedHandler)
 
-	// t.bot.RegisterHandler(bot.HandlerTypeMessageText, "/add", bot.MatchTypePrefix, t.addFavoriteHandler)
-	// t.bot.RegisterHandler(bot.HandlerTypeMessageText, "/remove", bot.MatchTypePrefix, t.removeFavoriteHandler)
-
-	// t.bot.RegisterHandler(bot.HandlerTypeMessageText, "/m", bot.MatchTypePrefix, t.searchMovieHandler)
-	// t.bot.RegisterHandler(bot.HandlerTypeMessageText, "/t", bot.MatchTypePrefix, t.searchTVHandler)
+	t.bot.RegisterHandler(bot.HandlerTypeMessageText, "/m", bot.MatchTypePrefix, t.searchMovieHandler)
+	t.bot.RegisterHandler(bot.HandlerTypeMessageText, "/t", bot.MatchTypePrefix, t.searchTVHandler)
 }
 
 func (t *TGBot) useKeyboard() {
-	initReplyKeyboard(t.bot)
+	t.initReplyKeyboard(t.bot)
 }

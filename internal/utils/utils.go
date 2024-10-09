@@ -1,8 +1,10 @@
 package utils
 
 import (
+	"database/sql"
 	"fmt"
 	"strings"
+	"time"
 )
 
 func EscapeString(s string) string {
@@ -49,4 +51,12 @@ func MapToSlice[K comparable, V any](m map[K]V) []V {
 		s = append(s, v)
 	}
 	return s
+}
+
+func GetReleaseDate(in string) (sql.NullTime, error) {
+	relesaseDate, err := time.Parse("2006-01-02", in)
+	if err != nil {
+		return sql.NullTime{}, fmt.Errorf("parse release date from %s error: %s", in, err.Error())
+	}
+	return sql.NullTime{Time: relesaseDate, Valid: true}, nil
 }

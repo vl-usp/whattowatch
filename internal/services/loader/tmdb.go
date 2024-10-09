@@ -139,7 +139,7 @@ func (l *TMDbLoader) discoverAndSave(ctx context.Context, dt types.ContentType) 
 			movies := make(types.ContentSlice, 0, len(res.Results))
 			moviesGenresMap := make(map[int64][]int64, len(res.Results))
 			for _, movie := range res.Results {
-				releaseDate, err := types.GetReleaseDate(movie.ReleaseDate)
+				releaseDate, err := utils.GetReleaseDate(movie.ReleaseDate)
 				if err != nil {
 					l.log.Error("failed to get release date", "error", err.Error())
 				}
@@ -187,7 +187,7 @@ func (l *TMDbLoader) discoverAndSave(ctx context.Context, dt types.ContentType) 
 					tvTitle = tv.OriginalName
 				}
 
-				releaseDate, err := types.GetReleaseDate(tv.FirstAirDate)
+				releaseDate, err := utils.GetReleaseDate(tv.FirstAirDate)
 				if err != nil {
 					l.log.Error("failed to get release date", "error", err.Error())
 				}

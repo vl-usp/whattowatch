@@ -40,7 +40,7 @@ func (pg *PostgreSQL) GetGenres(ctx context.Context, contentID int64) (types.Gen
 }
 
 func (pg *PostgreSQL) GetGenresByIDs(ctx context.Context, ids []int64) (types.Genres, error) {
-	sql, args, err := sq.Select("t1.id", "t1.name", "t1.pretty_name").
+	sql, args, err := sq.Select("t1.id", "t1.name").
 		From("genres t1").
 		Where("t1.id = any(?)", ids).PlaceholderFormat(sq.Dollar).ToSql()
 	if err != nil {
@@ -57,7 +57,7 @@ func (pg *PostgreSQL) GetGenresByIDs(ctx context.Context, ids []int64) (types.Ge
 	genres := make(types.Genres, 0)
 	for rows.Next() {
 		genre := types.Genre{}
-		err = rows.Scan(&genre.ID, &genre.Name, &genre.PrettyName)
+		err = rows.Scan(&genre.ID, &genre.Name)
 		if err != nil {
 			return nil, err
 		}
