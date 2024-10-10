@@ -3,6 +3,7 @@ package botkit
 import (
 	"context"
 	"fmt"
+	"whattowatch/internal/utils"
 
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
@@ -10,140 +11,131 @@ import (
 	"github.com/go-telegram/ui/keyboard/reply"
 )
 
-var (
-	replyKeyboard *reply.ReplyKeyboard
-
-	popularMoviesPage int = 1
-	topMoviePage      int = 1
-
-	popularTVsPage int = 1
-	topTVsPage     int = 1
-)
-
-func (t *TGBot) initReplyKeyboard(b *bot.Bot) {
-	replyKeyboard = reply.New(
-		b,
-		reply.WithPrefix("rk"),
-		reply.IsSelective(),
-	).
-		Button("Фильмы", b, bot.MatchTypeExact, t.onMoviesKeyboard).
-		Button("Сериалы", b, bot.MatchTypeExact, t.onTVsKeyboard)
-}
-
+// TODO: сделать основную функцию, а эту использовать как обвязку + причесать логи
 func (t *TGBot) onMainKeyboard(ctx context.Context, b *bot.Bot, update *models.Update) {
-	replyKeyboard = reply.New(
-		b,
-		reply.WithPrefix("rk_main"),
-		reply.IsSelective(),
-	).
-		Button("Фильмы", b, bot.MatchTypeExact, t.onMoviesKeyboard).
-		Button("Сериалы", b, bot.MatchTypeExact, t.onTVsKeyboard)
+	if entry, ok := t.userData[update.Message.From.ID]; ok {
+		entry.replyKeyboard = reply.New(
+			b,
+			reply.WithPrefix("rk_main"),
+			reply.IsSelective(),
+		).
+			Button("Фильмы", b, bot.MatchTypeExact, t.onMoviesKeyboard).
+			Button("Сериалы", b, bot.MatchTypeExact, t.onTVsKeyboard)
 
-	b.SendMessage(ctx, &bot.SendMessageParams{
-		ChatID:      update.Message.Chat.ID,
-		Text:        "Выберите тип контента, который хотите посмотреть:",
-		ReplyMarkup: replyKeyboard,
-	})
+		t.userData[update.Message.From.ID] = entry
+
+		b.SendMessage(ctx, &bot.SendMessageParams{
+			ChatID:      update.Message.Chat.ID,
+			Text:        "Выберите тип контента, который хотите посмотреть",
+			ReplyMarkup: entry.replyKeyboard,
+		})
+	}
 }
 
 func (t *TGBot) onMoviesKeyboard(ctx context.Context, b *bot.Bot, update *models.Update) {
-	replyKeyboard = reply.New(
-		b,
-		reply.WithPrefix("rk_movies"),
-		reply.IsSelective(),
-	).
-		Button("Рекомендации", b, bot.MatchTypeExact, t.onMoviesRecomendations).
-		Button("Популярные", b, bot.MatchTypeExact, t.onMoviesPopular).
-		Button("Лучшие", b, bot.MatchTypeExact, t.onMoviesTop).
-		Button("Просмотренные", b, bot.MatchTypeExact, t.onMoviesViewed).
-		Row().
-		Button("Назад", b, bot.MatchTypePrefix, t.onMainKeyboard)
+	if entry, ok := t.userData[update.Message.From.ID]; ok {
+		entry.replyKeyboard = reply.New(
+			b,
+			reply.WithPrefix("rk_movies"),
+			reply.IsSelective(),
+		).
+			Button("Рекомендации", b, bot.MatchTypeExact, t.onMoviesRecomendations).
+			Button("Популярные", b, bot.MatchTypeExact, t.onMoviesPopular).
+			Button("Лучшие", b, bot.MatchTypeExact, t.onMoviesTop).
+			Button("Просмотренные", b, bot.MatchTypeExact, t.onMoviesViewed).
+			Row().
+			Button("Назад", b, bot.MatchTypePrefix, t.onMainKeyboard)
 
-	b.SendMessage(ctx, &bot.SendMessageParams{
-		ChatID:      update.Message.Chat.ID,
-		Text:        "Фильмы. Выберите раздел раздел:",
-		ReplyMarkup: replyKeyboard,
-	})
+		t.userData[update.Message.From.ID] = entry
+
+		b.SendMessage(ctx, &bot.SendMessageParams{
+			ChatID:      update.Message.Chat.ID,
+			Text:        "Выберите тип контента, который хотите посмотреть:",
+			ReplyMarkup: entry.replyKeyboard,
+		})
+	}
 }
 
 func (t *TGBot) onMoviesRecomendations(ctx context.Context, b *bot.Bot, update *models.Update) {
 	// TODO: вывод рекомендаций
 }
 
-func (t *TGBot) onMoviesPopular(ctx context.Context, b *bot.Bot, update *models.Update) {
-	m, err := t.api.GetMoviesPopular(ctx, popularMoviesPage)
+func (t *TGBot) getMoviePopular(ctx context.Context, chatID int64, userData UserData) {
+	m, err := t.api.GetMoviesPopular(ctx, userData.popularMoviesPage)
 	if err != nil {
-		b.SendMessage(ctx, &bot.SendMessageParams{
-			ChatID:      update.Message.Chat.ID,
+		t.bot.SendMessage(ctx, &bot.SendMessageParams{
+			ChatID:      chatID,
 			Text:        "Ошибка...",
-			ReplyMarkup: replyKeyboard,
+			ReplyMarkup: userData.replyKeyboard,
 		})
 	}
 
-	kb := inline.New(b).
+	kb := inline.New(t.bot).
 		Row().
 		Button("Назад", []byte("prev"), t.onMoviesPopularPage).
 		Button("Далее", []byte("next"), t.onMoviesPopularPage)
 
-	b.SendMessage(ctx, &bot.SendMessageParams{
-		ChatID:      update.Message.Chat.ID,
-		Text:        m.Print(fmt.Sprintf("Популярные фильмы #%d", popularMoviesPage)),
+	t.bot.SendMessage(ctx, &bot.SendMessageParams{
+		ChatID:      chatID,
+		Text:        m.Print(fmt.Sprintf("Популярные фильмы #%d", userData.popularMoviesPage)),
 		ReplyMarkup: kb,
 	})
 }
 
-func (t *TGBot) onMoviesPopularPage(ctx context.Context, b *bot.Bot, mes models.MaybeInaccessibleMessage, data []byte) {
-	if string(data) == "prev" {
-		popularMoviesPage--
-	} else if string(data) == "next" {
-		popularMoviesPage++
+func (t *TGBot) onMoviesPopular(ctx context.Context, b *bot.Bot, update *models.Update) {
+	log := t.log.With("fn", "onMoviesPopular", "user_id", update.Message.From.ID, "chat_id", update.Message.Chat.ID)
+	log.Debug("handler func start log")
+	if entry, ok := t.userData[update.Message.From.ID]; ok {
+		t.getMoviePopular(ctx, update.Message.Chat.ID, entry)
 	}
-
-	if popularMoviesPage <= 0 {
-		popularMoviesPage = 1
-	}
-
-	t.onMoviesPopular(ctx, b, &models.Update{
-		Message: mes.Message,
-	})
 }
 
-func (t *TGBot) onMoviesTop(ctx context.Context, b *bot.Bot, update *models.Update) {
-	m, err := t.api.GetMovieTop(ctx, topMoviePage)
+func (t *TGBot) onMoviesPopularPage(ctx context.Context, b *bot.Bot, mes models.MaybeInaccessibleMessage, data []byte) {
+	log := t.log.With("fn", "onMoviesPopularPage", "user_id", mes.Message.From.ID, "chat_id", mes.Message.Chat.ID)
+	log.Debug("handler func start log")
+	if entry, ok := t.userData[mes.Message.Chat.ID]; ok {
+		entry.popularMoviesPage = utils.HandlePage(entry.popularMoviesPage, string(data))
+		t.userData[mes.Message.Chat.ID] = entry
+		t.getMoviePopular(ctx, mes.Message.Chat.ID, entry)
+	}
+}
+
+func (t *TGBot) getMoviesTop(ctx context.Context, chatID int64, userData UserData) {
+	m, err := t.api.GetMovieTop(ctx, userData.topMoviePage)
 	if err != nil {
-		b.SendMessage(ctx, &bot.SendMessageParams{
-			ChatID:      update.Message.Chat.ID,
+		t.bot.SendMessage(ctx, &bot.SendMessageParams{
+			ChatID:      chatID,
 			Text:        "Ошибка...",
-			ReplyMarkup: replyKeyboard,
+			ReplyMarkup: userData.replyKeyboard,
 		})
 	}
 
-	kb := inline.New(b).
+	kb := inline.New(t.bot).
 		Row().
 		Button("Назад", []byte("prev"), t.onMoviesTopPage).
 		Button("Далее", []byte("next"), t.onMoviesTopPage)
 
-	b.SendMessage(ctx, &bot.SendMessageParams{
-		ChatID:      update.Message.Chat.ID,
-		Text:        m.Print(fmt.Sprintf("Лучшие фильмы #%d", topMoviePage)),
+	t.bot.SendMessage(ctx, &bot.SendMessageParams{
+		ChatID:      chatID,
+		Text:        m.Print(fmt.Sprintf("Лучшие фильмы #%d", userData.topMoviePage)),
 		ReplyMarkup: kb,
 	})
 }
 
+func (t *TGBot) onMoviesTop(ctx context.Context, b *bot.Bot, update *models.Update) {
+	log := t.log.With("fn", "onMoviesTop", "user_id", update.Message.From.ID, "chat_id", update.Message.Chat.ID)
+	log.Debug("handler func start log")
+	if entry, ok := t.userData[update.Message.From.ID]; ok {
+		t.getMoviesTop(ctx, update.Message.Chat.ID, entry)
+	}
+}
+
 func (t *TGBot) onMoviesTopPage(ctx context.Context, b *bot.Bot, mes models.MaybeInaccessibleMessage, data []byte) {
-	if string(data) == "prev" {
-		topMoviePage--
-	} else if string(data) == "next" {
-		topMoviePage++
+	if entry, ok := t.userData[mes.Message.From.ID]; ok {
+		entry.topMoviePage = utils.HandlePage(entry.topMoviePage, string(data))
+		t.userData[mes.Message.From.ID] = entry
+		t.getMoviesTop(ctx, mes.Message.Chat.ID, entry)
 	}
-
-	if topMoviePage <= 0 {
-		topMoviePage = 1
-	}
-
-	t.onMoviesTop(ctx, b, &models.Update{
-		Message: mes.Message,
-	})
 }
 
 func (t *TGBot) onMoviesViewed(ctx context.Context, b *bot.Bot, update *models.Update) {
@@ -151,103 +143,103 @@ func (t *TGBot) onMoviesViewed(ctx context.Context, b *bot.Bot, update *models.U
 }
 
 func (t *TGBot) onTVsKeyboard(ctx context.Context, b *bot.Bot, update *models.Update) {
-	replyKeyboard = reply.New(
-		b,
-		reply.WithPrefix("reply_keyboard_tvs"),
-		reply.IsSelective(),
-	).
-		Button("Рекомендации", b, bot.MatchTypeExact, t.onTVsRecomendations).
-		Button("Популярные", b, bot.MatchTypeExact, t.onTVsPopular).
-		Button("Лучшие", b, bot.MatchTypeExact, t.onTVsTop).
-		Button("Просмотренные", b, bot.MatchTypeExact, t.onTVsViewed).
-		Row().
-		Button("Назад", b, bot.MatchTypePrefix, t.onMainKeyboard)
+	if entry, ok := t.userData[update.Message.From.ID]; ok {
+		entry.replyKeyboard = reply.New(
+			b,
+			reply.WithPrefix("reply_keyboard_tvs"),
+			reply.IsSelective(),
+		).
+			Button("Рекомендации", b, bot.MatchTypeExact, t.onTVsRecomendations).
+			Button("Популярные", b, bot.MatchTypeExact, t.onTVsPopular).
+			Button("Лучшие", b, bot.MatchTypeExact, t.onTVsTop).
+			Button("Просмотренные", b, bot.MatchTypeExact, t.onTVsViewed).
+			Row().
+			Button("Назад", b, bot.MatchTypePrefix, t.onMainKeyboard)
 
-	b.SendMessage(ctx, &bot.SendMessageParams{
-		ChatID:      update.Message.Chat.ID,
-		Text:        "Сериалы. Выберите раздел:",
-		ReplyMarkup: replyKeyboard,
-	})
+		t.userData[update.Message.From.ID] = entry
+
+		b.SendMessage(ctx, &bot.SendMessageParams{
+			ChatID:      update.Message.Chat.ID,
+			Text:        "Сериалы. Выберите раздел:",
+			ReplyMarkup: entry.replyKeyboard,
+		})
+	}
 }
 
 func (t *TGBot) onTVsRecomendations(ctx context.Context, b *bot.Bot, update *models.Update) {
 	// TODO: вывод рекомендаций
 }
 
-func (t *TGBot) onTVsPopular(ctx context.Context, b *bot.Bot, update *models.Update) {
-	m, err := t.api.GetTVPopular(ctx, popularTVsPage)
+func (t *TGBot) getTVsPopular(ctx context.Context, chatID int64, userData UserData) {
+	m, err := t.api.GetTVPopular(ctx, userData.popularTVsPage)
 	if err != nil {
-		b.SendMessage(ctx, &bot.SendMessageParams{
-			ChatID:      update.Message.Chat.ID,
+		t.bot.SendMessage(ctx, &bot.SendMessageParams{
+			ChatID:      chatID,
 			Text:        err.Error(),
-			ReplyMarkup: replyKeyboard,
+			ReplyMarkup: userData.replyKeyboard,
 		})
 	}
 
-	kb := inline.New(b).
+	kb := inline.New(t.bot).
 		Row().
 		Button("Назад", []byte("prev"), t.onTVsPopularPage).
 		Button("Далее", []byte("next"), t.onTVsPopularPage)
 
-	b.SendMessage(ctx, &bot.SendMessageParams{
-		ChatID:      update.Message.Chat.ID,
-		Text:        m.Print(fmt.Sprintf("Популярные сериалы #%d", popularTVsPage)),
+	t.bot.SendMessage(ctx, &bot.SendMessageParams{
+		ChatID:      chatID,
+		Text:        m.Print(fmt.Sprintf("Популярные сериалы #%d", userData.popularTVsPage)),
 		ReplyMarkup: kb,
 	})
 }
 
-func (t *TGBot) onTVsPopularPage(ctx context.Context, b *bot.Bot, mes models.MaybeInaccessibleMessage, data []byte) {
-	if string(data) == "prev" {
-		popularTVsPage--
-	} else if string(data) == "next" {
-		popularTVsPage++
+func (t *TGBot) onTVsPopular(ctx context.Context, b *bot.Bot, update *models.Update) {
+	if entry, ok := t.userData[update.Message.From.ID]; ok {
+		t.getTVsPopular(ctx, update.Message.Chat.ID, entry)
 	}
-
-	if popularTVsPage <= 0 {
-		popularTVsPage = 1
-	}
-
-	t.onTVsPopular(ctx, b, &models.Update{
-		Message: mes.Message,
-	})
 }
 
-func (t *TGBot) onTVsTop(ctx context.Context, b *bot.Bot, update *models.Update) {
-	m, err := t.api.GetTVTop(ctx, topTVsPage)
+func (t *TGBot) onTVsPopularPage(ctx context.Context, b *bot.Bot, mes models.MaybeInaccessibleMessage, data []byte) {
+	if entry, ok := t.userData[mes.Message.From.ID]; ok {
+		entry.popularTVsPage = utils.HandlePage(entry.popularTVsPage, string(data))
+		t.userData[mes.Message.From.ID] = entry
+		t.getTVsPopular(ctx, mes.Message.Chat.ID, entry)
+	}
+}
+
+func (t *TGBot) getTVsTop(ctx context.Context, chatID int64, userData UserData) {
+	m, err := t.api.GetTVTop(ctx, userData.topTVsPage)
 	if err != nil {
-		b.SendMessage(ctx, &bot.SendMessageParams{
-			ChatID:      update.Message.Chat.ID,
+		t.bot.SendMessage(ctx, &bot.SendMessageParams{
+			ChatID:      chatID,
 			Text:        err.Error(),
-			ReplyMarkup: replyKeyboard,
+			ReplyMarkup: userData.replyKeyboard,
 		})
 	}
 
-	kb := inline.New(b).
+	kb := inline.New(t.bot).
 		Row().
 		Button("Назад", []byte("prev"), t.onTVsTopPage).
 		Button("Далее", []byte("next"), t.onTVsTopPage)
 
-	b.SendMessage(ctx, &bot.SendMessageParams{
-		ChatID:      update.Message.Chat.ID,
-		Text:        m.Print(fmt.Sprintf("Лучшие сериалы #%d", topTVsPage)),
+	t.bot.SendMessage(ctx, &bot.SendMessageParams{
+		ChatID:      chatID,
+		Text:        m.Print(fmt.Sprintf("Лучшие сериалы #%d", userData.topTVsPage)),
 		ReplyMarkup: kb,
 	})
 }
 
+func (t *TGBot) onTVsTop(ctx context.Context, b *bot.Bot, update *models.Update) {
+	if entry, ok := t.userData[update.Message.From.ID]; ok {
+		t.getTVsTop(ctx, update.Message.Chat.ID, entry)
+	}
+}
+
 func (t *TGBot) onTVsTopPage(ctx context.Context, b *bot.Bot, mes models.MaybeInaccessibleMessage, data []byte) {
-	if string(data) == "prev" {
-		topTVsPage--
-	} else if string(data) == "next" {
-		topTVsPage++
+	if entry, ok := t.userData[mes.Message.From.ID]; ok {
+		entry.topTVsPage = utils.HandlePage(entry.topTVsPage, string(data))
+		t.userData[mes.Message.From.ID] = entry
+		t.getTVsTop(ctx, mes.Message.Chat.ID, entry)
 	}
-
-	if topTVsPage <= 0 {
-		topTVsPage = 1
-	}
-
-	t.onTVsTop(ctx, b, &models.Update{
-		Message: mes.Message,
-	})
 }
 
 func (t *TGBot) onTVsViewed(ctx context.Context, b *bot.Bot, update *models.Update) {
@@ -255,9 +247,11 @@ func (t *TGBot) onTVsViewed(ctx context.Context, b *bot.Bot, update *models.Upda
 }
 
 func (t *TGBot) handlerReplyKeyboard(ctx context.Context, b *bot.Bot, update *models.Update) {
-	b.SendMessage(ctx, &bot.SendMessageParams{
-		ChatID:      update.Message.Chat.ID,
-		Text:        "Выберите тип контента, который хотите посмотреть:",
-		ReplyMarkup: replyKeyboard,
-	})
+	if entry, ok := t.userData[update.Message.From.ID]; ok {
+		b.SendMessage(ctx, &bot.SendMessageParams{
+			ChatID:      update.Message.Chat.ID,
+			Text:        "Выберите тип контента, который хотите посмотреть",
+			ReplyMarkup: entry.replyKeyboard,
+		})
+	}
 }

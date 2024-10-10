@@ -60,3 +60,17 @@ func GetReleaseDate(in string) (sql.NullTime, error) {
 	}
 	return sql.NullTime{Time: relesaseDate, Valid: true}, nil
 }
+
+func HandlePage(page int, order string) int {
+	if order == "prev" {
+		page--
+	} else if order == "next" {
+		page++
+	}
+
+	if page <= 0 {
+		return 1
+	}
+
+	return page
+}

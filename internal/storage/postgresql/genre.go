@@ -19,7 +19,7 @@ func (pg *PostgreSQL) GetGenres(ctx context.Context, contentID int64) (types.Gen
 		return nil, err
 	}
 
-	rows, err := pg.pool.Query(ctx, sql, args...)
+	rows, err := pg.conn.Query(ctx, sql, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -47,7 +47,7 @@ func (pg *PostgreSQL) GetGenresByIDs(ctx context.Context, ids []int64) (types.Ge
 		return nil, err
 	}
 
-	rows, err := pg.pool.Query(ctx, sql, args...)
+	rows, err := pg.conn.Query(ctx, sql, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -77,7 +77,7 @@ func (pg *PostgreSQL) InsertGenres(ctx context.Context, genres types.Genres) err
 		return err
 	}
 
-	_, err = pg.pool.Exec(ctx, sql, args...)
+	_, err = pg.conn.Exec(ctx, sql, args...)
 	if err != nil {
 		return fmt.Errorf("failed to insert genre: %s", err.Error())
 	}
@@ -110,7 +110,7 @@ func (pg *PostgreSQL) InsertContentGenres(ctx context.Context, contentID int64, 
 		return err
 	}
 
-	_, err = pg.pool.Exec(ctx, sql, args...)
+	_, err = pg.conn.Exec(ctx, sql, args...)
 	if err != nil {
 		return fmt.Errorf("failed to insert link between film content and genre: %s", err.Error())
 	}

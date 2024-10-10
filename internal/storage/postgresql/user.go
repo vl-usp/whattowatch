@@ -14,7 +14,7 @@ func (pg *PostgreSQL) GetUser(ctx context.Context, id int) (types.User, error) {
 		return types.User{}, err
 	}
 	var user types.User
-	err = pg.pool.QueryRow(ctx, sql, args...).Scan(&user.ID, &user.FirstName, &user.LastName, &user.Username, &user.LanguageCode)
+	err = pg.conn.QueryRow(ctx, sql, args...).Scan(&user.ID, &user.FirstName, &user.LastName, &user.Username, &user.LanguageCode)
 	if err != nil {
 		return types.User{}, err
 	}
@@ -28,7 +28,7 @@ func (pg *PostgreSQL) InsertUser(ctx context.Context, user types.User) error {
 	if err != nil {
 		return err
 	}
-	_, err = pg.pool.Exec(ctx, sql, args...)
+	_, err = pg.conn.Exec(ctx, sql, args...)
 	if err != nil {
 		return fmt.Errorf("failed to insert tg user: %s", err.Error())
 	}

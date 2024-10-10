@@ -12,6 +12,20 @@ import (
 type ContentStorer interface {
 	GetContent(ctx context.Context, id int64) (types.Content, error)
 	InsertContentSlice(ctx context.Context, contents types.ContentSlice) error
+	GetContentStatus(ctx context.Context, userID int64, contentID int64) (types.ContentStatus, error)
+
+	FavoriteContentStorer
+	ViewedContentStorer
+}
+
+type FavoriteContentStorer interface {
+	AddContentToFavorite(ctx context.Context, userID int64, contentID int64) error
+	RemoveContentFromFavorite(ctx context.Context, userID int64, contentID int64) error
+}
+
+type ViewedContentStorer interface {
+	AddContentToViewed(ctx context.Context, userID int64, contentID int64) error
+	RemoveContentFromViewed(ctx context.Context, userID int64, contentID int64) error
 }
 
 type GenreStorer interface {

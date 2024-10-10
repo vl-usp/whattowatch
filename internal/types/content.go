@@ -70,7 +70,7 @@ func (cs ContentSlice) Print(title string) string {
 	for _, c := range cs {
 		switch c.ContentType {
 		case Movie:
-			builder.WriteString("/m")
+			builder.WriteString("/f")
 		case TV:
 			builder.WriteString("/t")
 		}

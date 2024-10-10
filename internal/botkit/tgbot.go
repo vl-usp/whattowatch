@@ -10,7 +10,19 @@ import (
 	"whattowatch/internal/storage"
 
 	"github.com/go-telegram/bot"
+	"github.com/go-telegram/bot/models"
+	"github.com/go-telegram/ui/keyboard/reply"
 )
+
+type UserData struct {
+	replyKeyboard *reply.ReplyKeyboard
+
+	popularMoviesPage int
+	topMoviePage      int
+
+	popularTVsPage int
+	topTVsPage     int
+}
 
 type TGBot struct {
 	storer storage.Storer
@@ -20,8 +32,7 @@ type TGBot struct {
 	log *slog.Logger
 	cfg *config.Config
 
-	// TODO keyboard map[user_id]keyboard
-	// TODO pages map[user_id]struct{}
+	userData map[int64]UserData
 }
 
 func NewTGBot(cfg *config.Config, log *slog.Logger, storer storage.Storer) (*TGBot, error) {
@@ -36,10 +47,13 @@ func NewTGBot(cfg *config.Config, log *slog.Logger, storer storage.Storer) (*TGB
 
 		log: log.With("pkg", "botkit"),
 		cfg: cfg,
+
+		userData: make(map[int64]UserData),
 	}
 
 	opts := []bot.Option{
 		// bot.WithDebug(),
+		bot.WithMiddlewares(tgbot.userDataMiddleware),
 	}
 	b, err := bot.New(cfg.Tokens.TGBot, opts...)
 	if err != nil {
@@ -47,7 +61,7 @@ func NewTGBot(cfg *config.Config, log *slog.Logger, storer storage.Storer) (*TGB
 	}
 	tgbot.bot = b
 
-	tgbot.useKeyboard()
+	// tgbot.useKeyboard()
 	tgbot.useHandlers()
 
 	return tgbot, nil
@@ -55,7 +69,12 @@ func NewTGBot(cfg *config.Config, log *slog.Logger, storer storage.Storer) (*TGB
 
 func (t *TGBot) Start() {
 	log := t.log.With("fn", "Start")
-	log.Info("starting bot")
+	bot, err := t.bot.GetMe(context.Background())
+	if err != nil {
+		log.Error("failed to get bot info", "error", err.Error())
+		return
+	}
+	log.Info("starting bot", "bot_id", bot.ID)
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 	t.bot.Start(ctx)
@@ -72,10 +91,55 @@ func (t *TGBot) useHandlers() {
 	// t.bot.RegisterHandler(bot.HandlerTypeMessageText, "/add_viewed", bot.MatchTypePrefix, t.addViewedHandler)
 	// t.bot.RegisterHandler(bot.HandlerTypeMessageText, "/remove_viewed", bot.MatchTypePrefix, t.removeViewedHandler)
 
-	t.bot.RegisterHandler(bot.HandlerTypeMessageText, "/m", bot.MatchTypePrefix, t.searchMovieHandler)
+	t.bot.RegisterHandler(bot.HandlerTypeMessageText, "/f", bot.MatchTypePrefix, t.searchMovieHandler)
 	t.bot.RegisterHandler(bot.HandlerTypeMessageText, "/t", bot.MatchTypePrefix, t.searchTVHandler)
 }
 
-func (t *TGBot) useKeyboard() {
-	t.initReplyKeyboard(t.bot)
+// func (t *TGBot) useKeyboard() {
+// 	t.initReplyKeyboard(t.bot)
+// }
+
+func (t *TGBot) userDataMiddleware(next bot.HandlerFunc) bot.HandlerFunc {
+	return func(ctx context.Context, b *bot.Bot, update *models.Update) {
+		log := t.log.With("fn", "userDataMiddleware")
+
+		var id int64
+		if update.CallbackQuery != nil {
+			id = update.CallbackQuery.From.ID
+		} else {
+			id = update.Message.From.ID
+		}
+
+		if entry, ok := t.userData[id]; !ok {
+			log.Debug("init user data", "userID", id)
+
+			rk := reply.New(
+				b,
+				reply.WithPrefix("rk_main"),
+				reply.IsSelective(),
+			).
+				Button("Фильмы", b, bot.MatchTypeExact, t.onMoviesKeyboard).
+				Button("Сериалы", b, bot.MatchTypeExact, t.onTVsKeyboard)
+
+			ud := UserData{
+				replyKeyboard: rk,
+
+				popularMoviesPage: 1,
+				topMoviePage:      1,
+
+				popularTVsPage: 1,
+				topTVsPage:     1,
+			}
+
+			t.userData[id] = ud
+
+			b.SendMessage(ctx, &bot.SendMessageParams{
+				ChatID:      id,
+				Text:        "Выберите тип контента, который хотите посмотреть",
+				ReplyMarkup: entry.replyKeyboard,
+			})
+		}
+
+		next(ctx, b, update)
+	}
 }
