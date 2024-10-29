@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-type Content struct {
+type ContentItem struct {
 	ID          int64
 	ContentType ContentType
 	Title       string
@@ -19,7 +19,7 @@ type Content struct {
 	Genres      Genres
 }
 
-func (c Content) String() string {
+func (c ContentItem) String() string {
 	return fmt.Sprintf(
 		"ID: %d\nНазвание: %s\nЖанры: %s\nДата выхода: %s\nПопулярность: %f\nРейтинг: %f\nКоличество оценок: %d\nОписание: %s\n",
 		c.ID,
@@ -33,41 +33,12 @@ func (c Content) String() string {
 	)
 }
 
-type ContentSlice []Content
+type Content []ContentItem
 
-func (cs ContentSlice) IDs() []int64 {
-	res := make([]int64, 0, len(cs))
-	for _, c := range cs {
-		res = append(res, c.ID)
-	}
-	return res
-}
-
-func (cs ContentSlice) Titles() []string {
-	res := make([]string, 0, len(cs))
-	for _, movie := range cs {
-		res = append(res, movie.Title)
-	}
-	return res
-}
-
-func (cs ContentSlice) ContentTitilesMap() map[int][]string {
-	res := make(map[int][]string, len(cs))
-	for _, c := range cs {
-		contentTypeID := c.ContentType.EnumIndex()
-
-		if _, ok := res[contentTypeID]; !ok {
-			res[contentTypeID] = make([]string, 0)
-		}
-		res[contentTypeID] = append(res[contentTypeID], c.Title)
-	}
-	return res
-}
-
-func (cs ContentSlice) Print(title string) string {
+func (content Content) Print(title string) string {
 	builder := strings.Builder{}
 	builder.WriteString(fmt.Sprintf("%s\n", title))
-	for _, c := range cs {
+	for _, c := range content {
 		switch c.ContentType {
 		case Movie:
 			builder.WriteString("/f")
@@ -78,7 +49,3 @@ func (cs ContentSlice) Print(title string) string {
 	}
 	return builder.String()
 }
-
-type ContentsByTypes map[ContentType]ContentSlice
-
-type ContentsByGenres map[string]ContentSlice

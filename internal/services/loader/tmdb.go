@@ -136,7 +136,7 @@ func (l *TMDbLoader) discoverAndSave(ctx context.Context, dt types.ContentType) 
 				return err
 			}
 			l.log.Info("discover movies success", "page", page, "total_pages", res.TotalPages, "total_results", res.TotalResults)
-			movies := make(types.ContentSlice, 0, len(res.Results))
+			movies := make(types.Content, 0, len(res.Results))
 			moviesGenresMap := make(map[int64][]int64, len(res.Results))
 			for _, movie := range res.Results {
 				releaseDate, err := utils.GetReleaseDate(movie.ReleaseDate)
@@ -144,7 +144,7 @@ func (l *TMDbLoader) discoverAndSave(ctx context.Context, dt types.ContentType) 
 					l.log.Error("failed to get release date", "error", err.Error())
 				}
 
-				movies = append(movies, types.Content{
+				movies = append(movies, types.ContentItem{
 					ID:          movie.ID,
 					ContentType: dt,
 					Title:       movie.Title,
@@ -159,7 +159,7 @@ func (l *TMDbLoader) discoverAndSave(ctx context.Context, dt types.ContentType) 
 				moviesGenresMap[movie.ID] = movie.GenreIDs
 			}
 
-			err = l.storer.InsertContentSlice(ctx, movies)
+			err = l.storer.InsertContent(ctx, movies)
 			if err != nil {
 				l.log.Error("failed to insert movies", "error", err.Error(), "page", page, "movies", movies)
 				return err
@@ -179,7 +179,7 @@ func (l *TMDbLoader) discoverAndSave(ctx context.Context, dt types.ContentType) 
 				return err
 			}
 			l.log.Info("discover TVs success", "page", page, "total_pages", res.TotalPages, "total_results", res.TotalResults)
-			tvs := make(types.ContentSlice, 0, len(res.Results))
+			tvs := make(types.Content, 0, len(res.Results))
 			tvsGenresMap := make(map[int64][]int64, len(res.Results))
 			for _, tv := range res.Results {
 				tvTitle := tv.Name
@@ -192,7 +192,7 @@ func (l *TMDbLoader) discoverAndSave(ctx context.Context, dt types.ContentType) 
 					l.log.Error("failed to get release date", "error", err.Error())
 				}
 
-				tvs = append(tvs, types.Content{
+				tvs = append(tvs, types.ContentItem{
 					ID:          tv.ID,
 					ContentType: dt,
 					Title:       tvTitle,
@@ -206,7 +206,7 @@ func (l *TMDbLoader) discoverAndSave(ctx context.Context, dt types.ContentType) 
 				tvsGenresMap[tv.ID] = tv.GenreIDs
 			}
 
-			err = l.storer.InsertContentSlice(ctx, tvs)
+			err = l.storer.InsertContent(ctx, tvs)
 			if err != nil {
 				l.log.Error("failed to insert tvs", "error", err.Error(), "page", page, "tvs", tvs)
 				return err

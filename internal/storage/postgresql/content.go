@@ -8,12 +8,12 @@ import (
 	sq "github.com/Masterminds/squirrel"
 )
 
-func (pg *PostgreSQL) GetContent(ctx context.Context, id int64) (types.Content, error) {
+func (pg *PostgreSQL) GetContentItem(ctx context.Context, id int64) (types.ContentItem, error) {
 	sql, args, err := sq.Select("*").PlaceholderFormat(sq.Dollar).From("content").Where(sq.Eq{"id": id}).ToSql()
 	if err != nil {
-		return types.Content{}, err
+		return types.ContentItem{}, err
 	}
-	var fc types.Content
+	var fc types.ContentItem
 	err = pg.conn.QueryRow(ctx, sql, args...).Scan(
 		&fc.ID,
 		&fc.ContentType,
@@ -26,12 +26,12 @@ func (pg *PostgreSQL) GetContent(ctx context.Context, id int64) (types.Content, 
 		&fc.VoteCount,
 	)
 	if err != nil {
-		return types.Content{}, err
+		return types.ContentItem{}, err
 	}
 	return fc, nil
 }
 
-func (pg *PostgreSQL) InsertContentSlice(ctx context.Context, contents types.ContentSlice) error {
+func (pg *PostgreSQL) InsertContent(ctx context.Context, contents types.Content) error {
 	builder := sq.Insert("content").Columns(
 		"id",
 		"content_type_id",
@@ -114,7 +114,7 @@ func (pg *PostgreSQL) GetContentStatus(ctx context.Context, userID int64, conten
 	return cs, nil
 }
 
-func (pg *PostgreSQL) AddContentToFavorite(ctx context.Context, userID int64, contentID int64) error {
+func (pg *PostgreSQL) AddContentItemToFavorite(ctx context.Context, userID int64, contentID int64) error {
 	sql, args, err := sq.Insert("users_favorites").Columns("user_id", "content_id").Values(userID, contentID).PlaceholderFormat(sq.Dollar).ToSql()
 	if err != nil {
 		return fmt.Errorf("failed to build sql query: %s", err.Error())
@@ -127,7 +127,7 @@ func (pg *PostgreSQL) AddContentToFavorite(ctx context.Context, userID int64, co
 	return nil
 }
 
-func (pg *PostgreSQL) RemoveContentFromFavorite(ctx context.Context, userID int64, contentID int64) error {
+func (pg *PostgreSQL) RemoveContentItemFromFavorite(ctx context.Context, userID int64, contentID int64) error {
 	sql, args, err := sq.Delete("users_favorites").Where(sq.Eq{"user_id": userID, "content_id": contentID}).PlaceholderFormat(sq.Dollar).ToSql()
 	if err != nil {
 		return fmt.Errorf("failed to build sql query: %s", err.Error())
@@ -140,7 +140,7 @@ func (pg *PostgreSQL) RemoveContentFromFavorite(ctx context.Context, userID int6
 	return nil
 }
 
-func (pg *PostgreSQL) AddContentToViewed(ctx context.Context, userID int64, contentID int64) error {
+func (pg *PostgreSQL) AddContentItemToViewed(ctx context.Context, userID int64, contentID int64) error {
 	sql, args, err := sq.Insert("users_viewed").Columns("user_id", "content_id").Values(userID, contentID).PlaceholderFormat(sq.Dollar).ToSql()
 	if err != nil {
 		return fmt.Errorf("failed to build sql query: %s", err.Error())
@@ -153,7 +153,7 @@ func (pg *PostgreSQL) AddContentToViewed(ctx context.Context, userID int64, cont
 	return nil
 }
 
-func (pg *PostgreSQL) RemoveContentFromViewed(ctx context.Context, userID int64, contentID int64) error {
+func (pg *PostgreSQL) RemoveContentItemFromViewed(ctx context.Context, userID int64, contentID int64) error {
 	sql, args, err := sq.Delete("users_viewed").Where(sq.Eq{"user_id": userID, "content_id": contentID}).PlaceholderFormat(sq.Dollar).ToSql()
 	if err != nil {
 		return fmt.Errorf("failed to build sql query: %s", err.Error())

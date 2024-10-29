@@ -40,15 +40,15 @@ func New(cfg *config.Config, storer storage.Storer, log *slog.Logger) (*TMDbApi,
 	}, nil
 }
 
-func (a *TMDbApi) GetMovie(ctx context.Context, id int) (types.Content, error) {
+func (a *TMDbApi) GetMovie(ctx context.Context, id int) (types.ContentItem, error) {
 	m, err := a.client.GetMovieDetails(id, a.opts)
 	if err != nil {
-		return types.Content{}, err
+		return types.ContentItem{}, err
 	}
 
 	rd, err := utils.GetReleaseDate(m.ReleaseDate)
 	if err != nil {
-		return types.Content{}, err
+		return types.ContentItem{}, err
 	}
 
 	genres := make(types.Genres, 0, len(m.Genres))
@@ -57,7 +57,7 @@ func (a *TMDbApi) GetMovie(ctx context.Context, id int) (types.Content, error) {
 		genres = append(genres, types.Genre{ID: genre.ID, Name: genre.Name})
 	}
 
-	return types.Content{
+	return types.ContentItem{
 		ID:          m.ID,
 		ContentType: types.Movie,
 		Title:       m.Title,
@@ -71,15 +71,15 @@ func (a *TMDbApi) GetMovie(ctx context.Context, id int) (types.Content, error) {
 	}, nil
 }
 
-func (a *TMDbApi) GetTV(ctx context.Context, id int) (types.Content, error) {
+func (a *TMDbApi) GetTV(ctx context.Context, id int) (types.ContentItem, error) {
 	m, err := a.client.GetTVDetails(id, a.opts)
 	if err != nil {
-		return types.Content{}, err
+		return types.ContentItem{}, err
 	}
 
 	rd, err := utils.GetReleaseDate(m.FirstAirDate)
 	if err != nil {
-		return types.Content{}, err
+		return types.ContentItem{}, err
 	}
 
 	genres := make(types.Genres, 0, len(m.Genres))
@@ -87,7 +87,7 @@ func (a *TMDbApi) GetTV(ctx context.Context, id int) (types.Content, error) {
 		genres = append(genres, types.Genre{ID: genre.ID, Name: genre.Name})
 	}
 
-	return types.Content{
+	return types.ContentItem{
 		ID:          m.ID,
 		ContentType: types.TV,
 		Title:       m.Name,
@@ -101,7 +101,7 @@ func (a *TMDbApi) GetTV(ctx context.Context, id int) (types.Content, error) {
 	}, nil
 }
 
-func (a *TMDbApi) GetMoviesPopular(ctx context.Context, page int) (types.ContentSlice, error) {
+func (a *TMDbApi) GetMoviesPopular(ctx context.Context, page int) (types.Content, error) {
 	a.opts["page"] = fmt.Sprintf("%d", page)
 	defer delete(a.opts, "page")
 
@@ -110,7 +110,7 @@ func (a *TMDbApi) GetMoviesPopular(ctx context.Context, page int) (types.Content
 		return nil, err
 	}
 
-	res := make(types.ContentSlice, 0, len(m.MoviePopularResults.Results))
+	res := make(types.Content, 0, len(m.MoviePopularResults.Results))
 	for _, v := range m.MoviePopularResults.Results {
 		rd, err := utils.GetReleaseDate(v.ReleaseDate)
 		if err != nil {
@@ -130,7 +130,7 @@ func (a *TMDbApi) GetMoviesPopular(ctx context.Context, page int) (types.Content
 			})
 		}
 
-		res = append(res, types.Content{
+		res = append(res, types.ContentItem{
 			ID:          v.ID,
 			ContentType: types.Movie,
 			Title:       title,
@@ -147,7 +147,7 @@ func (a *TMDbApi) GetMoviesPopular(ctx context.Context, page int) (types.Content
 	return res, nil
 }
 
-func (a *TMDbApi) GetTVPopular(ctx context.Context, page int) (types.ContentSlice, error) {
+func (a *TMDbApi) GetTVPopular(ctx context.Context, page int) (types.Content, error) {
 	a.opts["page"] = fmt.Sprintf("%d", page)
 	defer delete(a.opts, "page")
 
@@ -156,7 +156,7 @@ func (a *TMDbApi) GetTVPopular(ctx context.Context, page int) (types.ContentSlic
 		return nil, err
 	}
 
-	res := make(types.ContentSlice, 0, len(m.Results))
+	res := make(types.Content, 0, len(m.Results))
 	for _, v := range m.Results {
 		rd, err := utils.GetReleaseDate(v.FirstAirDate)
 		if err != nil {
@@ -173,7 +173,7 @@ func (a *TMDbApi) GetTVPopular(ctx context.Context, page int) (types.ContentSlic
 			return nil, err
 		}
 
-		res = append(res, types.Content{
+		res = append(res, types.ContentItem{
 			ID:          v.ID,
 			ContentType: types.TV,
 			Title:       title,
@@ -190,7 +190,7 @@ func (a *TMDbApi) GetTVPopular(ctx context.Context, page int) (types.ContentSlic
 	return res, nil
 }
 
-func (a *TMDbApi) GetMovieTop(ctx context.Context, page int) (types.ContentSlice, error) {
+func (a *TMDbApi) GetMovieTop(ctx context.Context, page int) (types.Content, error) {
 	a.opts["page"] = fmt.Sprintf("%d", page)
 	defer delete(a.opts, "page")
 
@@ -199,7 +199,7 @@ func (a *TMDbApi) GetMovieTop(ctx context.Context, page int) (types.ContentSlice
 		return nil, err
 	}
 
-	res := make(types.ContentSlice, 0, len(m.Results))
+	res := make(types.Content, 0, len(m.Results))
 	for _, v := range m.Results {
 		rd, err := utils.GetReleaseDate(v.ReleaseDate)
 		if err != nil {
@@ -219,7 +219,7 @@ func (a *TMDbApi) GetMovieTop(ctx context.Context, page int) (types.ContentSlice
 			})
 		}
 
-		res = append(res, types.Content{
+		res = append(res, types.ContentItem{
 			ID:          v.ID,
 			ContentType: types.Movie,
 			Title:       title,
@@ -236,7 +236,7 @@ func (a *TMDbApi) GetMovieTop(ctx context.Context, page int) (types.ContentSlice
 	return res, nil
 }
 
-func (a *TMDbApi) GetTVTop(ctx context.Context, page int) (types.ContentSlice, error) {
+func (a *TMDbApi) GetTVTop(ctx context.Context, page int) (types.Content, error) {
 	a.opts["page"] = fmt.Sprintf("%d", page)
 	defer delete(a.opts, "page")
 
@@ -245,7 +245,7 @@ func (a *TMDbApi) GetTVTop(ctx context.Context, page int) (types.ContentSlice, e
 		return nil, err
 	}
 
-	res := make(types.ContentSlice, 0, len(m.Results))
+	res := make(types.Content, 0, len(m.Results))
 	for _, v := range m.Results {
 		rd, err := utils.GetReleaseDate(v.FirstAirDate)
 		if err != nil {
@@ -262,7 +262,7 @@ func (a *TMDbApi) GetTVTop(ctx context.Context, page int) (types.ContentSlice, e
 			return nil, err
 		}
 
-		res = append(res, types.Content{
+		res = append(res, types.ContentItem{
 			ID:          v.ID,
 			ContentType: types.TV,
 			Title:       title,

@@ -162,7 +162,7 @@ func (t *TGBot) onAddFavorite(ctx context.Context, b *bot.Bot, mes models.MaybeI
 		return
 	}
 
-	err = t.storer.AddContentToFavorite(ctx, mes.Message.Chat.ID, int64(id))
+	err = t.storer.AddContentItemToFavorite(ctx, mes.Message.Chat.ID, int64(id))
 	if err != nil {
 		log.Error("failed to add favorite", "error", err.Error())
 	}
@@ -177,7 +177,7 @@ func (t *TGBot) onRemoveFavorite(ctx context.Context, b *bot.Bot, mes models.May
 		return
 	}
 
-	err = t.storer.RemoveContentFromFavorite(ctx, mes.Message.Chat.ID, int64(id))
+	err = t.storer.RemoveContentItemFromFavorite(ctx, mes.Message.Chat.ID, int64(id))
 	if err != nil {
 		log.Error("failed to remove favorite", "error", err.Error())
 	}
@@ -192,7 +192,7 @@ func (t *TGBot) onAddViewed(ctx context.Context, b *bot.Bot, mes models.MaybeIna
 		return
 	}
 
-	err = t.storer.AddContentToViewed(ctx, mes.Message.Chat.ID, int64(id))
+	err = t.storer.AddContentItemToViewed(ctx, mes.Message.Chat.ID, int64(id))
 	if err != nil {
 		log.Error("failed to add viewed", "error", err.Error())
 	}
@@ -207,7 +207,7 @@ func (t *TGBot) onRemoveViewed(ctx context.Context, b *bot.Bot, mes models.Maybe
 		return
 	}
 
-	err = t.storer.RemoveContentFromViewed(ctx, mes.Message.Chat.ID, int64(id))
+	err = t.storer.RemoveContentItemFromViewed(ctx, mes.Message.Chat.ID, int64(id))
 	if err != nil {
 		log.Error("failed to remove viewed", "error", err.Error())
 	}
