@@ -58,6 +58,9 @@ func (t *TGBot) onMoviesKeyboard(ctx context.Context, b *bot.Bot, update *models
 
 func (t *TGBot) onMoviesRecomendations(ctx context.Context, b *bot.Bot, update *models.Update) {
 	// TODO: вывод рекомендаций
+	// 1) получение просмотренных
+	// 2) получение избранных
+	// 3) получение рекомендаций по избранным исключая просмотренные
 }
 
 func (t *TGBot) getMoviePopular(ctx context.Context, chatID int64, userData UserData) {

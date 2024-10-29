@@ -8,6 +8,7 @@ import (
 	sq "github.com/Masterminds/squirrel"
 )
 
+// TODO: добавить получение жанров
 func (pg *PostgreSQL) GetContentItem(ctx context.Context, id int64) (types.ContentItem, error) {
 	sql, args, err := sq.Select("*").PlaceholderFormat(sq.Dollar).From("content").Where(sq.Eq{"id": id}).ToSql()
 	if err != nil {
@@ -31,6 +32,7 @@ func (pg *PostgreSQL) GetContentItem(ctx context.Context, id int64) (types.Conte
 	return fc, nil
 }
 
+// TODO: добавить вставку жанров, если они есть
 func (pg *PostgreSQL) InsertContent(ctx context.Context, contents types.Content) error {
 	builder := sq.Insert("content").Columns(
 		"id",
@@ -140,6 +142,43 @@ func (pg *PostgreSQL) RemoveContentItemFromFavorite(ctx context.Context, userID 
 	return nil
 }
 
+func (pg *PostgreSQL) GetFavoriteContent(ctx context.Context, userID int64) (types.Content, error) {
+	sql, args, err := sq.Select("t1.*").
+		From("content t1").
+		Join("users_favorites t2 ON t1.id = t2.content_id").
+		Where(sq.Eq{"t2.user_id": userID}).ToSql()
+	if err != nil {
+		return nil, fmt.Errorf("failed to build sql query: %s", err.Error())
+	}
+
+	rows, err := pg.conn.Query(ctx, sql, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get favorite content: %s", err.Error())
+	}
+	defer rows.Close()
+
+	content := make(types.Content, 0)
+	for rows.Next() {
+		c := types.ContentItem{}
+		err = rows.Scan(
+			&c.ID,
+			&c.ContentType,
+			&c.Title,
+			&c.Overview,
+			&c.Popularity,
+			&c.PosterPath,
+			&c.ReleaseDate,
+			&c.VoteAverage,
+			&c.VoteCount,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan row: %s", err.Error())
+		}
+		content = append(content, c)
+	}
+	return content, nil
+}
+
 func (pg *PostgreSQL) AddContentItemToViewed(ctx context.Context, userID int64, contentID int64) error {
 	sql, args, err := sq.Insert("users_viewed").Columns("user_id", "content_id").Values(userID, contentID).PlaceholderFormat(sq.Dollar).ToSql()
 	if err != nil {
@@ -164,4 +203,41 @@ func (pg *PostgreSQL) RemoveContentItemFromViewed(ctx context.Context, userID in
 		return fmt.Errorf("failed to insert viewed: %s", err.Error())
 	}
 	return nil
+}
+
+func (pg *PostgreSQL) GetViewedContent(ctx context.Context, userID int64) (types.Content, error) {
+	sql, args, err := sq.Select("t1.*").
+		From("content t1").
+		Join("users_viewed t2 ON t1.id = t2.content_id").
+		Where(sq.Eq{"t2.user_id": userID}).ToSql()
+	if err != nil {
+		return nil, fmt.Errorf("failed to build sql query: %s", err.Error())
+	}
+
+	rows, err := pg.conn.Query(ctx, sql, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get viewed content: %s", err.Error())
+	}
+	defer rows.Close()
+
+	content := make(types.Content, 0)
+	for rows.Next() {
+		c := types.ContentItem{}
+		err = rows.Scan(
+			&c.ID,
+			&c.ContentType,
+			&c.Title,
+			&c.Overview,
+			&c.Popularity,
+			&c.PosterPath,
+			&c.ReleaseDate,
+			&c.VoteAverage,
+			&c.VoteCount,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan row: %s", err.Error())
+		}
+		content = append(content, c)
+	}
+	return content, nil
 }

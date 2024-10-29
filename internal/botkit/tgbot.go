@@ -61,7 +61,6 @@ func NewTGBot(cfg *config.Config, log *slog.Logger, storer storage.Storer) (*TGB
 	}
 	tgbot.bot = b
 
-	// tgbot.useKeyboard()
 	tgbot.useHandlers()
 
 	return tgbot, nil
@@ -85,19 +84,9 @@ func (t *TGBot) useHandlers() {
 	t.bot.RegisterHandler(bot.HandlerTypeMessageText, "/start", bot.MatchTypePrefix, t.registerHandler)
 	t.bot.RegisterHandler(bot.HandlerTypeMessageText, "/menu", bot.MatchTypePrefix, t.handlerReplyKeyboard)
 
-	// t.bot.RegisterHandler(bot.HandlerTypeMessageText, "/add_favorite", bot.MatchTypePrefix, t.addFavoriteHandler)
-	// t.bot.RegisterHandler(bot.HandlerTypeMessageText, "/remove_favorite", bot.MatchTypePrefix, t.removeFavoriteHandler)
-
-	// t.bot.RegisterHandler(bot.HandlerTypeMessageText, "/add_viewed", bot.MatchTypePrefix, t.addViewedHandler)
-	// t.bot.RegisterHandler(bot.HandlerTypeMessageText, "/remove_viewed", bot.MatchTypePrefix, t.removeViewedHandler)
-
-	t.bot.RegisterHandler(bot.HandlerTypeMessageText, "/f", bot.MatchTypePrefix, t.searchMovieHandler)
-	t.bot.RegisterHandler(bot.HandlerTypeMessageText, "/t", bot.MatchTypePrefix, t.searchTVHandler)
+	t.bot.RegisterHandler(bot.HandlerTypeMessageText, "/f", bot.MatchTypePrefix, t.searchHandler)
+	t.bot.RegisterHandler(bot.HandlerTypeMessageText, "/t", bot.MatchTypePrefix, t.searchHandler)
 }
-
-// func (t *TGBot) useKeyboard() {
-// 	t.initReplyKeyboard(t.bot)
-// }
 
 func (t *TGBot) userDataMiddleware(next bot.HandlerFunc) bot.HandlerFunc {
 	return func(ctx context.Context, b *bot.Bot, update *models.Update) {

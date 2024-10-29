@@ -58,72 +58,30 @@ func (t *TGBot) helpHandler(ctx context.Context, b *bot.Bot, update *models.Upda
 	}
 }
 
-// TODO: сделать основную функцию, а эту использовать как обвязку + причесать логи
-func (t *TGBot) searchMovieHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
-	log := t.log.With("fn", "searchMovieHandler", "user_id", update.Message.From.ID, "chat_id", update.Message.Chat.ID)
+func (t *TGBot) searchHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
+	log := t.log.With("fn", "searchHandler", "user_id", update.Message.From.ID, "chat_id", update.Message.Chat.ID)
 	log.Debug("handler func start log")
 
-	strID := update.Message.Text[2:]
-	id, err := strconv.Atoi(update.Message.Text[2:])
-	if err != nil {
-		log.Error("failed to parse id", "error", err.Error())
-	}
-
-	m, err := t.api.GetMovie(ctx, id)
-	if err != nil {
-		log.Error("failed to get movie", "error", err.Error())
-		return
-	}
-
-	cs, err := t.storer.GetContentStatus(ctx, update.Message.From.ID, m.ID)
-	if err != nil {
-		log.Error("failed to get content status", "error", err.Error())
-		return
-	}
-
-	kb := inline.New(b).Row()
-	if cs.IsFavorite {
-		kb = kb.Button("Удалить из избранных", []byte(strID), t.onRemoveFavorite)
-	} else {
-		kb = kb.Button("Добавить в избранные", []byte(strID), t.onAddFavorite)
-	}
-
-	if cs.IsViewed {
-		kb = kb.Button("Удалить из просмотренных", []byte(strID), t.onRemoveViewed)
-	} else {
-		kb = kb.Button("Добавить в просмотренные", []byte(strID), t.onAddViewed)
-	}
-
-	_, err = b.SendPhoto(ctx, &bot.SendPhotoParams{
-		ChatID:      update.Message.Chat.ID,
-		Photo:       &models.InputFileString{Data: m.PosterPath},
-		Caption:     m.String(),
-		ReplyMarkup: kb,
-	})
-
-	if err != nil {
-		log.Error("failed to send message", "error", err.Error())
-	}
-}
-
-// TODO: сделать основную функцию, а эту использовать как обвязку + причесать логи
-func (t *TGBot) searchTVHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
-	log := t.log.With("fn", "searchTVHandler", "user_id", update.Message.From.ID, "chat_id", update.Message.Chat.ID)
-	log.Debug("handler func start log")
-
+	contentType := update.Message.Text[:2]
 	strID := update.Message.Text[2:]
 	id, err := strconv.Atoi(strID)
 	if err != nil {
 		log.Error("failed to parse id", "error", err.Error())
 	}
+	var contentItem types.ContentItem
 
-	m, err := t.api.GetTV(ctx, id)
+	switch contentType {
+	case "/f":
+		contentItem, err = t.api.GetMovie(ctx, id)
+	case "/t":
+		contentItem, err = t.api.GetTV(ctx, id)
+	}
 	if err != nil {
-		log.Error("failed to get movie", "error", err.Error())
+		log.Error("failed to get content item", "error", err.Error())
 		return
 	}
 
-	cs, err := t.storer.GetContentStatus(ctx, update.Message.From.ID, m.ID)
+	cs, err := t.storer.GetContentStatus(ctx, update.Message.From.ID, contentItem.ID)
 	if err != nil {
 		log.Error("failed to get content status", "error", err.Error())
 		return
@@ -144,8 +102,8 @@ func (t *TGBot) searchTVHandler(ctx context.Context, b *bot.Bot, update *models.
 
 	_, err = b.SendPhoto(ctx, &bot.SendPhotoParams{
 		ChatID:      update.Message.Chat.ID,
-		Photo:       &models.InputFileString{Data: m.PosterPath},
-		Caption:     m.String(),
+		Photo:       &models.InputFileString{Data: contentItem.PosterPath},
+		Caption:     contentItem.String(),
 		ReplyMarkup: kb,
 	})
 	if err != nil {
