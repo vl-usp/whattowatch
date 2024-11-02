@@ -8,7 +8,6 @@ import (
 	sq "github.com/Masterminds/squirrel"
 )
 
-// TODO: добавить получение жанров
 func (pg *PostgreSQL) GetContentItem(ctx context.Context, id int64) (types.ContentItem, error) {
 	sql, args, err := sq.Select("*").PlaceholderFormat(sq.Dollar).From("content").Where(sq.Eq{"id": id}).ToSql()
 	if err != nil {
@@ -29,12 +28,17 @@ func (pg *PostgreSQL) GetContentItem(ctx context.Context, id int64) (types.Conte
 	if err != nil {
 		return types.ContentItem{}, err
 	}
+
+	fc.Genres, err = pg.GetGenres(ctx, fc.ID)
+	if err != nil {
+		return types.ContentItem{}, err
+	}
+
 	return fc, nil
 }
 
-// TODO: добавить вставку жанров, если они есть
 func (pg *PostgreSQL) InsertContent(ctx context.Context, contents types.Content) error {
-	builder := sq.Insert("content").Columns(
+	contentBuilder := sq.Insert("content").Columns(
 		"id",
 		"content_type_id",
 		"title",
@@ -46,8 +50,12 @@ func (pg *PostgreSQL) InsertContent(ctx context.Context, contents types.Content)
 		"vote_count",
 	).PlaceholderFormat(sq.Dollar)
 
+	genresBuilder := sq.Insert("link_content_genres").
+		Columns("content_id", "genre_id").
+		PlaceholderFormat(sq.Dollar)
+
 	for _, c := range contents {
-		builder = builder.Values(
+		contentBuilder = contentBuilder.Values(
 			c.ID,
 			c.ContentType.EnumIndex(),
 			c.Title,
@@ -58,16 +66,41 @@ func (pg *PostgreSQL) InsertContent(ctx context.Context, contents types.Content)
 			c.VoteAverage,
 			c.VoteCount,
 		)
+
+		for _, g := range c.Genres {
+			genresBuilder = genresBuilder.Values(c.ID, g.ID)
+		}
 	}
 
-	sql, args, err := builder.Suffix("ON CONFLICT DO NOTHING").ToSql()
+	contentSql, contentArgs, err := contentBuilder.Suffix("ON CONFLICT DO NOTHING").ToSql()
 	if err != nil {
 		return fmt.Errorf("failed to build insert content query: %s", err.Error())
 	}
 
-	_, err = pg.conn.Exec(ctx, sql, args...)
+	genresSql, genresArgs, err := genresBuilder.Suffix("ON CONFLICT DO NOTHING").ToSql()
+	if err != nil {
+		return fmt.Errorf("failed to build insert content genres query: %s", err.Error())
+	}
+
+	tx, err := pg.conn.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %s", err.Error())
+	}
+	defer tx.Rollback(ctx)
+
+	// Insert content and genres
+	_, err = tx.Exec(ctx, contentSql, contentArgs...)
 	if err != nil {
 		return fmt.Errorf("failed to insert content: %s", err.Error())
+	}
+
+	_, err = tx.Exec(ctx, genresSql, genresArgs...)
+	if err != nil {
+		return fmt.Errorf("failed to insert content genres: %s", err.Error())
+	}
+
+	if err = tx.Commit(ctx); err != nil {
+		return fmt.Errorf("failed to commit transaction: %s", err.Error())
 	}
 
 	return nil

@@ -137,11 +137,16 @@ func (l *TMDbLoader) discoverAndSave(ctx context.Context, dt types.ContentType) 
 			}
 			l.log.Info("discover movies success", "page", page, "total_pages", res.TotalPages, "total_results", res.TotalResults)
 			movies := make(types.Content, 0, len(res.Results))
-			moviesGenresMap := make(map[int64][]int64, len(res.Results))
+			// moviesGenresMap := make(map[int64][]int64, len(res.Results))
 			for _, movie := range res.Results {
 				releaseDate, err := utils.GetReleaseDate(movie.ReleaseDate)
 				if err != nil {
 					l.log.Error("failed to get release date", "error", err.Error())
+				}
+
+				genres := make(types.Genres, 0, len(movie.GenreIDs))
+				for _, genreID := range movie.GenreIDs {
+					genres = append(genres, types.Genre{ID: genreID})
 				}
 
 				movies = append(movies, types.ContentItem{
@@ -154,9 +159,10 @@ func (l *TMDbLoader) discoverAndSave(ctx context.Context, dt types.ContentType) 
 					ReleaseDate: releaseDate,
 					VoteAverage: movie.VoteAverage,
 					VoteCount:   movie.VoteCount,
+					Genres:      genres,
 				})
 
-				moviesGenresMap[movie.ID] = movie.GenreIDs
+				// moviesGenresMap[movie.ID] = movie.GenreIDs
 			}
 
 			err = l.storer.InsertContent(ctx, movies)
@@ -165,13 +171,13 @@ func (l *TMDbLoader) discoverAndSave(ctx context.Context, dt types.ContentType) 
 				return err
 			}
 
-			for movieID, genreIDs := range moviesGenresMap {
-				err = l.storer.InsertContentGenres(ctx, movieID, genreIDs)
-				if err != nil {
-					l.log.Error("failed to insert movies genres", "error", err.Error(), "movieID", movieID, "genreIDs", genreIDs)
-					return err
-				}
-			}
+			// for movieID, genreIDs := range moviesGenresMap {
+			// 	err = l.storer.InsertContentGenres(ctx, movieID, genreIDs)
+			// 	if err != nil {
+			// 		l.log.Error("failed to insert movies genres", "error", err.Error(), "movieID", movieID, "genreIDs", genreIDs)
+			// 		return err
+			// 	}
+			// }
 		case types.TV:
 			res, err := l.client.GetDiscoverTV(l.options)
 			if err != nil {
@@ -180,7 +186,7 @@ func (l *TMDbLoader) discoverAndSave(ctx context.Context, dt types.ContentType) 
 			}
 			l.log.Info("discover TVs success", "page", page, "total_pages", res.TotalPages, "total_results", res.TotalResults)
 			tvs := make(types.Content, 0, len(res.Results))
-			tvsGenresMap := make(map[int64][]int64, len(res.Results))
+			// tvsGenresMap := make(map[int64][]int64, len(res.Results))
 			for _, tv := range res.Results {
 				tvTitle := tv.Name
 				if tv.Name == "" {
@@ -190,6 +196,11 @@ func (l *TMDbLoader) discoverAndSave(ctx context.Context, dt types.ContentType) 
 				releaseDate, err := utils.GetReleaseDate(tv.FirstAirDate)
 				if err != nil {
 					l.log.Error("failed to get release date", "error", err.Error())
+				}
+
+				genres := make(types.Genres, 0, len(tv.GenreIDs))
+				for _, genreID := range tv.GenreIDs {
+					genres = append(genres, types.Genre{ID: genreID})
 				}
 
 				tvs = append(tvs, types.ContentItem{
@@ -202,8 +213,9 @@ func (l *TMDbLoader) discoverAndSave(ctx context.Context, dt types.ContentType) 
 					PosterPath:  l.cfg.Urls.TMDbImageUrl + tv.PosterPath,
 					VoteAverage: tv.VoteAverage,
 					VoteCount:   tv.VoteCount,
+					Genres:      genres,
 				})
-				tvsGenresMap[tv.ID] = tv.GenreIDs
+				// tvsGenresMap[tv.ID] = tv.GenreIDs
 			}
 
 			err = l.storer.InsertContent(ctx, tvs)
@@ -212,13 +224,13 @@ func (l *TMDbLoader) discoverAndSave(ctx context.Context, dt types.ContentType) 
 				return err
 			}
 
-			for tvID, genreIDs := range tvsGenresMap {
-				err = l.storer.InsertContentGenres(ctx, tvID, genreIDs)
-				if err != nil {
-					l.log.Error("failed to insert tvs genres", "error", err.Error(), "tvID", tvID, "genreIDs", genreIDs)
-					return err
-				}
-			}
+			// for tvID, genreIDs := range tvsGenresMap {
+			// 	err = l.storer.InsertContentGenres(ctx, tvID, genreIDs)
+			// 	if err != nil {
+			// 		l.log.Error("failed to insert tvs genres", "error", err.Error(), "tvID", tvID, "genreIDs", genreIDs)
+			// 		return err
+			// 	}
+			// }
 		}
 	}
 	return nil
