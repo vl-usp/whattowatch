@@ -129,87 +129,114 @@ func (l *TMDbLoader) discoverAndSave(ctx context.Context, dt types.ContentType) 
 	for page := fromPage; page <= toPage; page++ {
 		l.options["page"] = fmt.Sprintf("%d", page)
 
+		l.log.Info("trying to discover", "page", page, "content type", dt)
+
+		content := make(types.Content, 0)
 		switch dt {
 		case types.Movie:
 			res, err := l.client.GetDiscoverMovie(l.options)
 			if err != nil {
 				return err
 			}
-			l.log.Info("discover movies success", "page", page)
-			movies := make(types.Content, 0, len(res.Results))
-
-			for _, movie := range res.Results {
-				releaseDate, err := utils.GetReleaseDate(movie.ReleaseDate)
-				if err != nil {
-					l.log.Error("failed to get release date", "error", err.Error(), "id", movie.ID, "release_date", movie.ReleaseDate)
-				}
-
-				genres := make(types.Genres, 0, len(movie.GenreIDs))
-				for _, genreID := range movie.GenreIDs {
-					genres = append(genres, types.Genre{ID: genreID})
-				}
-
-				movies = append(movies, types.ContentItem{
-					ID:          movie.ID,
-					ContentType: dt,
-					Title:       movie.Title,
-					Overview:    movie.Overview,
-					Popularity:  movie.Popularity,
-					PosterPath:  l.cfg.Urls.TMDbImageUrl + movie.PosterPath,
-					ReleaseDate: releaseDate,
-					VoteAverage: movie.VoteAverage,
-					VoteCount:   movie.VoteCount,
-					Genres:      genres,
-				})
-			}
-
-			err = l.storer.InsertContent(ctx, movies)
-			if err != nil {
-				return err
-			}
+			content = l.convertMovies(res)
 		case types.TV:
 			res, err := l.client.GetDiscoverTV(l.options)
 			if err != nil {
 				return err
 			}
-			l.log.Info("discover TVs success", "page", page, "total_pages", res.TotalPages, "total_results", res.TotalResults)
-			tvs := make(types.Content, 0, len(res.Results))
-
-			for _, tv := range res.Results {
-				tvTitle := tv.Name
-				if tv.Name == "" {
-					tvTitle = tv.OriginalName
-				}
-
-				releaseDate, err := utils.GetReleaseDate(tv.FirstAirDate)
-				if err != nil {
-					l.log.Error("failed to get release date", "error", err.Error())
-				}
-
-				genres := make(types.Genres, 0, len(tv.GenreIDs))
-				for _, genreID := range tv.GenreIDs {
-					genres = append(genres, types.Genre{ID: genreID})
-				}
-
-				tvs = append(tvs, types.ContentItem{
-					ID:          tv.ID,
-					ContentType: dt,
-					Title:       tvTitle,
-					Overview:    tv.Overview,
-					Popularity:  tv.Popularity,
-					ReleaseDate: releaseDate,
-					PosterPath:  l.cfg.Urls.TMDbImageUrl + tv.PosterPath,
-					VoteAverage: tv.VoteAverage,
-					VoteCount:   tv.VoteCount,
-					Genres:      genres,
-				})
-			}
-
-			err = l.storer.InsertContent(ctx, tvs)
-			if err != nil {
-				return err
-			}
+			content = l.convertTVs(res)
 		}
+
+		if len(content) == 0 {
+			l.log.Info("discover content empty", "page", page, "content type", dt)
+			continue
+		}
+
+		l.log.Info("discover content success", "page", page, "content type", dt, "count", len(content))
+
+		err := l.storer.InsertContent(ctx, content)
+		if err != nil {
+			return err
+		}
+
+		l.log.Info("insert content success", "page", page, "content type", dt, "count", len(content))
 	}
 	return nil
+}
+
+func (l *TMDbLoader) convertMovies(movies *tmdbLib.DiscoverMovie) types.Content {
+	result := make(types.Content, 0, len(movies.Results))
+
+	for _, movie := range movies.Results {
+		// skip movies with empty overview
+		if movie.Overview == "" {
+			continue
+		}
+
+		releaseDate, err := utils.GetReleaseDate(movie.ReleaseDate)
+		if err != nil {
+			l.log.Error("failed to get release date", "error", err.Error(), "id", movie.ID, "release_date", movie.ReleaseDate)
+		}
+
+		genres := make(types.Genres, 0, len(movie.GenreIDs))
+		for _, genreID := range movie.GenreIDs {
+			genres = append(genres, types.Genre{ID: genreID})
+		}
+
+		result = append(result, types.ContentItem{
+			ID:          movie.ID,
+			ContentType: types.Movie,
+			Title:       movie.Title,
+			Overview:    movie.Overview,
+			Popularity:  movie.Popularity,
+			PosterPath:  l.cfg.Urls.TMDbImageUrl + movie.PosterPath,
+			ReleaseDate: releaseDate,
+			VoteAverage: movie.VoteAverage,
+			VoteCount:   movie.VoteCount,
+			Genres:      genres,
+		})
+	}
+
+	return result
+}
+
+func (l *TMDbLoader) convertTVs(tvs *tmdbLib.DiscoverTV) types.Content {
+	result := make(types.Content, 0, len(tvs.Results))
+
+	for _, tv := range tvs.Results {
+		// skip tvs with empty overview
+		if tv.Overview == "" {
+			continue
+		}
+
+		tvTitle := tv.Name
+		if tv.Name == "" {
+			tvTitle = tv.OriginalName
+		}
+
+		releaseDate, err := utils.GetReleaseDate(tv.FirstAirDate)
+		if err != nil {
+			l.log.Error("failed to get release date", "error", err.Error(), "id", tv.ID, "release_date", tv.FirstAirDate)
+		}
+
+		genres := make(types.Genres, 0, len(tv.GenreIDs))
+		for _, genreID := range tv.GenreIDs {
+			genres = append(genres, types.Genre{ID: genreID})
+		}
+
+		result = append(result, types.ContentItem{
+			ID:          tv.ID,
+			ContentType: types.TV,
+			Title:       tvTitle,
+			Overview:    tv.Overview,
+			Popularity:  tv.Popularity,
+			ReleaseDate: releaseDate,
+			PosterPath:  l.cfg.Urls.TMDbImageUrl + tv.PosterPath,
+			VoteAverage: tv.VoteAverage,
+			VoteCount:   tv.VoteCount,
+			Genres:      genres,
+		})
+	}
+
+	return result
 }
