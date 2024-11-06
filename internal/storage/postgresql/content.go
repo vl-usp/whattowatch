@@ -37,7 +37,7 @@ func (pg *PostgreSQL) GetContentItem(ctx context.Context, id int64) (types.Conte
 	return fc, nil
 }
 
-func (pg *PostgreSQL) InsertContent(ctx context.Context, contents types.Content) error {
+func (pg *PostgreSQL) InsertContent(ctx context.Context, content types.Content) error {
 	contentBuilder := sq.Insert("content").Columns(
 		"id",
 		"content_type_id",
@@ -54,7 +54,7 @@ func (pg *PostgreSQL) InsertContent(ctx context.Context, contents types.Content)
 		Columns("content_id", "genre_id").
 		PlaceholderFormat(sq.Dollar)
 
-	for _, c := range contents {
+	for _, c := range content {
 		contentBuilder = contentBuilder.Values(
 			c.ID,
 			c.ContentType.EnumIndex(),
@@ -91,12 +91,13 @@ func (pg *PostgreSQL) InsertContent(ctx context.Context, contents types.Content)
 	// Insert content and genres
 	_, err = tx.Exec(ctx, contentSql, contentArgs...)
 	if err != nil {
-		return fmt.Errorf("failed to insert content: %s", err.Error())
+		return fmt.Errorf("failed to insert content: %s; data: %v", err.Error(), content)
 	}
+	// pg.log.Debug("content inserted", "type", content[0].ContentType, "ids", content.GetIDsWithGenres())
 
 	_, err = tx.Exec(ctx, genresSql, genresArgs...)
 	if err != nil {
-		return fmt.Errorf("failed to insert content genres: %s", err.Error())
+		return fmt.Errorf("failed to insert content genres: %s; ids: %v; kv-ids: %v", err.Error(), content.GetIDs(), content.GetIDsWithGenres())
 	}
 
 	if err = tx.Commit(ctx); err != nil {

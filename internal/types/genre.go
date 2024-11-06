@@ -26,3 +26,11 @@ func (g Genres) String() string {
 	}
 	return strings.Join(names, ", ")
 }
+
+func (g Genres) GetIDs() []int64 {
+	ids := make([]int64, 0, len(g))
+	for _, genre := range g {
+		ids = append(ids, genre.ID)
+	}
+	return ids
+}

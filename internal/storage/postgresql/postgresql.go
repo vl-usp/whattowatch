@@ -13,7 +13,7 @@ type PostgreSQL struct {
 	log  *slog.Logger
 }
 
-func New(cfg *config.Config, log *slog.Logger) (*PostgreSQL, error) {
+func New(cfg *config.Config, logger *slog.Logger) (*PostgreSQL, error) {
 	pgxConfig, err := pgxpool.ParseConfig(cfg.DB.PostgresDSN)
 	if err != nil {
 		return nil, err
@@ -25,7 +25,7 @@ func New(cfg *config.Config, log *slog.Logger) (*PostgreSQL, error) {
 	}
 
 	return &PostgreSQL{
-		log:  log,
+		log:  logger.With("pkg", "postgresql"),
 		conn: conn,
 	}, nil
 }

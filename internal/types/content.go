@@ -49,3 +49,29 @@ func (content Content) Print(title string) string {
 	}
 	return builder.String()
 }
+
+type IDsWithGenreIDs struct {
+	ID   int64
+	GIDs []int64
+}
+
+func (content Content) GetIDs() []int64 {
+	ids := make([]int64, 0, len(content))
+	for _, c := range content {
+		ids = append(ids, c.ID)
+	}
+	return ids
+}
+
+func (content Content) GetIDsWithGenres() []IDsWithGenreIDs {
+	result := make([]IDsWithGenreIDs, 0, len(content))
+
+	for _, c := range content {
+		result = append(result, IDsWithGenreIDs{
+			ID:   c.ID,
+			GIDs: c.Genres.GetIDs(),
+		})
+	}
+
+	return result
+}

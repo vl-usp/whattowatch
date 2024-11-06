@@ -23,11 +23,13 @@ func main() {
 
 	storer, err := storage.New(cfg, log)
 	if err != nil {
-		log.Error("creating a storage error", "error", err.Error())
+		log.Error("creating storage error", "error", err.Error())
+		panic("creating storage error: " + err.Error())
 	}
 	loader, err := loader.NewTMDbLoader(cfg, log, storer)
 	if err != nil {
-		log.Error("creating a loader error", "error", err.Error())
+		log.Error("creating loader error", "error", err.Error())
+		panic("creating loader error: " + err.Error())
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())

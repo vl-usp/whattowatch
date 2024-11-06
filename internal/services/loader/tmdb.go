@@ -27,7 +27,7 @@ type TMDbLoader struct {
 	options map[string]string
 }
 
-func NewTMDbLoader(cfg *config.Config, log *slog.Logger, storer storage.Storer) (*TMDbLoader, error) {
+func NewTMDbLoader(cfg *config.Config, logger *slog.Logger, storer storage.Storer) (*TMDbLoader, error) {
 	u, err := url.Parse(cfg.Urls.TMDbApiUrl)
 	if err != nil {
 		return nil, err
@@ -38,7 +38,8 @@ func NewTMDbLoader(cfg *config.Config, log *slog.Logger, storer storage.Storer) 
 		return nil, err
 	}
 	c.SetClientAutoRetry()
-	// c.SetAlternateBaseURL()
+
+	log := logger.With("pkg", "loader")
 
 	loader := &TMDbLoader{
 		log:     log,
@@ -132,16 +133,15 @@ func (l *TMDbLoader) discoverAndSave(ctx context.Context, dt types.ContentType) 
 		case types.Movie:
 			res, err := l.client.GetDiscoverMovie(l.options)
 			if err != nil {
-				l.log.Error("failed to discover movies", "error", err.Error())
 				return err
 			}
-			l.log.Info("discover movies success", "page", page, "total_pages", res.TotalPages, "total_results", res.TotalResults)
+			l.log.Info("discover movies success", "page", page)
 			movies := make(types.Content, 0, len(res.Results))
-			// moviesGenresMap := make(map[int64][]int64, len(res.Results))
+
 			for _, movie := range res.Results {
 				releaseDate, err := utils.GetReleaseDate(movie.ReleaseDate)
 				if err != nil {
-					l.log.Error("failed to get release date", "error", err.Error())
+					l.log.Error("failed to get release date", "error", err.Error(), "id", movie.ID, "release_date", movie.ReleaseDate)
 				}
 
 				genres := make(types.Genres, 0, len(movie.GenreIDs))
@@ -161,32 +161,20 @@ func (l *TMDbLoader) discoverAndSave(ctx context.Context, dt types.ContentType) 
 					VoteCount:   movie.VoteCount,
 					Genres:      genres,
 				})
-
-				// moviesGenresMap[movie.ID] = movie.GenreIDs
 			}
 
 			err = l.storer.InsertContent(ctx, movies)
 			if err != nil {
-				l.log.Error("failed to insert movies", "error", err.Error(), "page", page, "movies", movies)
 				return err
 			}
-
-			// for movieID, genreIDs := range moviesGenresMap {
-			// 	err = l.storer.InsertContentGenres(ctx, movieID, genreIDs)
-			// 	if err != nil {
-			// 		l.log.Error("failed to insert movies genres", "error", err.Error(), "movieID", movieID, "genreIDs", genreIDs)
-			// 		return err
-			// 	}
-			// }
 		case types.TV:
 			res, err := l.client.GetDiscoverTV(l.options)
 			if err != nil {
-				l.log.Error("failed to discover TVs", "error", err.Error())
 				return err
 			}
 			l.log.Info("discover TVs success", "page", page, "total_pages", res.TotalPages, "total_results", res.TotalResults)
 			tvs := make(types.Content, 0, len(res.Results))
-			// tvsGenresMap := make(map[int64][]int64, len(res.Results))
+
 			for _, tv := range res.Results {
 				tvTitle := tv.Name
 				if tv.Name == "" {
@@ -215,22 +203,12 @@ func (l *TMDbLoader) discoverAndSave(ctx context.Context, dt types.ContentType) 
 					VoteCount:   tv.VoteCount,
 					Genres:      genres,
 				})
-				// tvsGenresMap[tv.ID] = tv.GenreIDs
 			}
 
 			err = l.storer.InsertContent(ctx, tvs)
 			if err != nil {
-				l.log.Error("failed to insert tvs", "error", err.Error(), "page", page, "tvs", tvs)
 				return err
 			}
-
-			// for tvID, genreIDs := range tvsGenresMap {
-			// 	err = l.storer.InsertContentGenres(ctx, tvID, genreIDs)
-			// 	if err != nil {
-			// 		l.log.Error("failed to insert tvs genres", "error", err.Error(), "tvID", tvID, "genreIDs", genreIDs)
-			// 		return err
-			// 	}
-			// }
 		}
 	}
 	return nil

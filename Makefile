@@ -33,6 +33,8 @@ migration-down:
 migration-down-all:
 	$(LOCAL_BIN)/goose -dir $(MIGRATION_DIR) postgres $(POSTGRES_DSN) down-to 0 -v
 
+migration-reset: migration-down-all migration-up
+
 docker-up:
 	mkdir -p .tmp
 	docker compose build --progress plain &> .tmp/build.log
