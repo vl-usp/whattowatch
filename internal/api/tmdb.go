@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"time"
 	"whattowatch/internal/config"
 	"whattowatch/internal/storage"
 	"whattowatch/internal/types"
@@ -20,6 +21,14 @@ type TMDbApi struct {
 	cfg *config.Config
 	log *slog.Logger
 }
+
+type recomendationsJob struct {
+	movies *tmdb.MovieRecommendations
+	tvs    *tmdb.TVRecommendations
+	err    error
+}
+
+var workerCnt = 10
 
 func New(cfg *config.Config, storer storage.Storer, log *slog.Logger) (*TMDbApi, error) {
 	opts := make(map[string]string)
@@ -277,4 +286,114 @@ func (a *TMDbApi) GetTVTop(ctx context.Context, page int) (types.Content, error)
 	}
 
 	return res, nil
+}
+
+func (a *TMDbApi) GetMovieRecomendations(ctx context.Context, ids []int64) (types.Content, error) {
+	log := a.log.With("method", "GetMovieRecomendations")
+
+	content := make(types.Content, 0, len(ids))
+
+	for i := 0; i < len(ids); i++ {
+		id := int(ids[i])
+		a.opts["page"] = "1"
+		res, err := a.client.GetMovieRecommendations(id, a.opts)
+		log.Info("request to TMDb", "id", id)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, v := range res.Results {
+			if v.Overview == "" {
+				log.Warn("empty overview", "id", v.ID)
+				continue
+			}
+
+			rd, err := utils.GetReleaseDate(v.ReleaseDate)
+			if err != nil {
+				log.Error("get release date error", "id", v.ID, "error", err.Error())
+				continue
+			}
+
+			filterTime, err := time.Parse("2006-01-02", "2012-01-01")
+			if err != nil {
+				log.Error("parse filter date error", "error", err.Error())
+				continue
+			}
+
+			if rd.Time.Before(filterTime) {
+				continue
+			}
+
+			content = append(content, types.ContentItem{
+				ID:          v.ID,
+				ContentType: types.Movie,
+				Title:       v.Title,
+				Overview:    v.Overview,
+				Popularity:  v.Popularity,
+				PosterPath:  a.cfg.Urls.TMDbImageUrl + v.PosterPath,
+				ReleaseDate: rd,
+				VoteAverage: v.VoteAverage,
+				VoteCount:   v.VoteCount,
+			})
+		}
+	}
+
+	return content, nil
+}
+
+func (a *TMDbApi) GetTVRecomendations(ctx context.Context, ids []int64) (types.Content, error) {
+	jobs := make(chan int, len(ids))
+	resJobs := make(chan recomendationsJob, len(ids))
+	content := make(types.Content, 0, len(ids))
+	defer close(resJobs)
+
+	for i := 0; i < workerCnt; i++ {
+		go func() {
+			for id := range jobs {
+				a.opts["page"] = "1"
+				res, err := a.client.GetTVRecommendations(id, a.opts)
+				if err != nil {
+					resJobs <- recomendationsJob{err: err}
+					continue
+				}
+				resJobs <- recomendationsJob{tvs: res}
+			}
+		}()
+	}
+
+	for i := 0; i < len(ids); i++ {
+		jobs <- int(ids[i])
+	}
+	close(jobs)
+
+	for i := 0; i < len(ids); i++ {
+		res := <-resJobs
+		if res.err == nil {
+			return nil, res.err
+		}
+		for _, v := range res.tvs.Results {
+			if v.Overview == "" {
+				continue
+			}
+
+			rd, err := utils.GetReleaseDate(v.FirstAirDate)
+			if err != nil {
+				continue
+			}
+
+			content = append(content, types.ContentItem{
+				ID:          v.ID,
+				ContentType: types.TV,
+				Title:       v.Name,
+				Overview:    v.Overview,
+				Popularity:  v.Popularity,
+				PosterPath:  a.cfg.Urls.TMDbImageUrl + v.PosterPath,
+				ReleaseDate: rd,
+				VoteAverage: v.VoteAverage,
+				VoteCount:   v.VoteCount,
+			})
+		}
+	}
+
+	return content, nil
 }

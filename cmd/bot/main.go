@@ -16,13 +16,14 @@ func main() {
 
 	storer, err := storage.New(cfg, log)
 	if err != nil {
-		log.Error("creating a storage error", "error", err.Error())
+		log.Error("storage create error", "error", err.Error())
+		panic("storage create error: " + err.Error())
 	}
 
 	bot, err := botkit.NewTGBot(cfg, log, storer)
 	if err != nil {
-		log.Error("creating a TGBot error", "error", err.Error())
-		panic(err.Error())
+		log.Error("TGBot create error", "error", err.Error())
+		panic("TGBot create error: " + err.Error())
 	}
 	bot.Start()
 }

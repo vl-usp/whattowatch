@@ -57,7 +57,7 @@ func (pg *PostgreSQL) InsertContent(ctx context.Context, content types.Content) 
 	for _, c := range content {
 		contentBuilder = contentBuilder.Values(
 			c.ID,
-			c.ContentType.EnumIndex(),
+			c.ContentType.ID(),
 			c.Title,
 			c.Overview,
 			c.Popularity,
@@ -93,11 +93,11 @@ func (pg *PostgreSQL) InsertContent(ctx context.Context, content types.Content) 
 	if err != nil {
 		return fmt.Errorf("failed to insert content: %s; data: %v", err.Error(), content)
 	}
-	// pg.log.Debug("content inserted", "type", content[0].ContentType, "ids", content.GetIDsWithGenres())
+	// pg.log.Debug("content inserted", "type", content[0].ContentType, "ids", content.IDsWithGenres())
 
 	_, err = tx.Exec(ctx, genresSql, genresArgs...)
 	if err != nil {
-		return fmt.Errorf("failed to insert content genres: %s; ids: %v; kv-ids: %v", err.Error(), content.GetIDs(), content.GetIDsWithGenres())
+		return fmt.Errorf("failed to insert content genres: %s; ids: %v; kv-ids: %v", err.Error(), content.IDs(), content.IDsWithGenres())
 	}
 
 	if err = tx.Commit(ctx); err != nil {
@@ -176,17 +176,19 @@ func (pg *PostgreSQL) RemoveContentItemFromFavorite(ctx context.Context, userID 
 	return nil
 }
 
-func (pg *PostgreSQL) GetFavoriteContent(ctx context.Context, userID int64) (types.Content, error) {
+func (pg *PostgreSQL) GetFavoriteContent(ctx context.Context, userID int64, contentType types.ContentType) (types.Content, error) {
 	sql, args, err := sq.Select("t1.*").
 		From("content t1").
 		Join("users_favorites t2 ON t1.id = t2.content_id").
-		Where(sq.Eq{"t2.user_id": userID}).ToSql()
+		Where(sq.And{sq.Eq{"t2.user_id": userID}, sq.Eq{"t1.content_type_id": contentType.ID()}}).
+		PlaceholderFormat(sq.Dollar).ToSql()
 	if err != nil {
 		return nil, fmt.Errorf("failed to build sql query: %s", err.Error())
 	}
 
 	rows, err := pg.conn.Query(ctx, sql, args...)
 	if err != nil {
+		pg.log.Error("failed to get favorite content", "error", err.Error(), "sql", sql, "args", args)
 		return nil, fmt.Errorf("failed to get favorite content: %s", err.Error())
 	}
 	defer rows.Close()
@@ -239,11 +241,12 @@ func (pg *PostgreSQL) RemoveContentItemFromViewed(ctx context.Context, userID in
 	return nil
 }
 
-func (pg *PostgreSQL) GetViewedContent(ctx context.Context, userID int64) (types.Content, error) {
+func (pg *PostgreSQL) GetViewedContent(ctx context.Context, userID int64, contentType types.ContentType) (types.Content, error) {
 	sql, args, err := sq.Select("t1.*").
 		From("content t1").
 		Join("users_viewed t2 ON t1.id = t2.content_id").
-		Where(sq.Eq{"t2.user_id": userID}).ToSql()
+		Where(sq.And{sq.Eq{"t2.user_id": userID}, sq.Eq{"t1.content_type_id": contentType.ID()}}).
+		PlaceholderFormat(sq.Dollar).ToSql()
 	if err != nil {
 		return nil, fmt.Errorf("failed to build sql query: %s", err.Error())
 	}

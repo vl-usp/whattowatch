@@ -22,14 +22,14 @@ type FavoriteContentStorer interface {
 	AddContentItemToFavorite(ctx context.Context, userID int64, contentID int64) error
 	RemoveContentItemFromFavorite(ctx context.Context, userID int64, contentID int64) error
 
-	GetFavoriteContent(ctx context.Context, userID int64) (types.Content, error)
+	GetFavoriteContent(ctx context.Context, userID int64, contentType types.ContentType) (types.Content, error)
 }
 
 type ViewedContentStorer interface {
 	AddContentItemToViewed(ctx context.Context, userID int64, contentID int64) error
 	RemoveContentItemFromViewed(ctx context.Context, userID int64, contentID int64) error
 
-	GetViewedContent(ctx context.Context, userID int64) (types.Content, error)
+	GetViewedContent(ctx context.Context, userID int64, contentType types.ContentType) (types.Content, error)
 }
 
 type GenreStorer interface {

@@ -3,15 +3,17 @@ package botkit
 import (
 	"context"
 	"fmt"
+	"sort"
+	"whattowatch/internal/types"
 	"whattowatch/internal/utils"
 
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
 	"github.com/go-telegram/ui/keyboard/inline"
 	"github.com/go-telegram/ui/keyboard/reply"
+	"github.com/go-telegram/ui/slider"
 )
 
-// TODO: сделать основную функцию, а эту использовать как обвязку + причесать логи
 func (t *TGBot) onMainKeyboard(ctx context.Context, b *bot.Bot, update *models.Update) {
 	if entry, ok := t.userData[update.Message.From.ID]; ok {
 		entry.replyKeyboard = reply.New(
@@ -57,12 +59,49 @@ func (t *TGBot) onMoviesKeyboard(ctx context.Context, b *bot.Bot, update *models
 }
 
 func (t *TGBot) onMoviesRecomendations(ctx context.Context, b *bot.Bot, update *models.Update) {
-	// TODO: вывод рекомендаций
+	log := t.log.With("fn", "onMoviesRecomendations", "user_id", update.Message.From.ID, "chat_id", update.Message.Chat.ID)
+
 	// 1) получение просмотренных
+	viewed, err := t.storer.GetViewedContent(ctx, update.Message.From.ID, types.Movie)
+	if err != nil {
+		log.Error("failed to get user viewed", "error", err.Error())
+	}
+
 	// 2) получение избранных
+	favorites, err := t.storer.GetFavoriteContent(ctx, update.Message.From.ID, types.Movie)
+	if err != nil {
+		log.Error("failed to get user favorites", "error", err.Error())
+	}
+
 	// 3) получение рекомендаций по избранным исключая просмотренные
+	recomendations, err := t.api.GetMovieRecomendations(ctx, favorites.IDs())
+	if err != nil {
+		log.Error("failed to get recomendations", "error", err.Error())
+	}
+
+	// 4) фильтрация рекомендаций по просмотренным
+	recomendations = recomendations.RemoveByIDs(viewed.IDs())
+	sort.Slice(recomendations, func(i, j int) bool {
+		return recomendations[i].Popularity > recomendations[j].Popularity
+	})
+
+	// 5) вывод рекомендаций в слайдере
+	log.Info("generating slides", "recomendations", len(recomendations))
+	slides := make([]slider.Slide, 0, len(recomendations))
+
+	for _, r := range recomendations {
+		slides = append(slides, slider.Slide{
+			Photo: r.PosterPath,
+			Text:  utils.EscapeString(r.String()),
+		})
+	}
+
+	opts := []slider.Option{}
+	sl := slider.New(slides, opts...)
+	sl.Show(ctx, b, update.Message.Chat.ID)
 }
 
+// TODO: переделать на слайдер
 func (t *TGBot) getMoviePopular(ctx context.Context, chatID int64, userData UserData) {
 	m, err := t.api.GetMoviesPopular(ctx, userData.popularMoviesPage)
 	if err != nil {
