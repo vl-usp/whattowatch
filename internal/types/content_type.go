@@ -22,6 +22,6 @@ func ParseContentType(s string) (ContentType, error) {
 	return 0, fmt.Errorf("unknown type")
 }
 
-func (w ContentType) EnumIndex() int {
+func (w ContentType) ID() int {
 	return int(w)
 }

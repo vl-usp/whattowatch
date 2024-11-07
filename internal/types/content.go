@@ -19,15 +19,29 @@ type ContentItem struct {
 	Genres      Genres
 }
 
+func SerializeContentItemKey(c ContentItem) string {
+	return fmt.Sprintf("%d_%d", c.ID, c.ContentType.ID())
+}
+
+func UnserializeContentItemKey(str string) (ContentItem, error) {
+	var id int64
+	var ct int
+	_, err := fmt.Sscanf(str, "%d_%d", &id, &ct)
+	if err != nil {
+		return ContentItem{}, err
+	}
+	return ContentItem{ID: id, ContentType: ContentType(ct)}, nil
+}
+
 func (c ContentItem) String() string {
 	return fmt.Sprintf(
-		"ID: %d\nНазвание: %s\nЖанры: %s\nДата выхода: %s\nПопулярность: %f\nРейтинг: %f\nКоличество оценок: %d\nОписание: %s\n",
+		"ID: /f%d\nНазвание: %s\nЖанры: %s\nДата выхода: %s\nПопулярность: %s\nРейтинг: %s\nКоличество оценок: %d\nОписание: %s",
 		c.ID,
 		c.Title,
 		c.Genres.String(),
 		c.ReleaseDate.Time.Format("02.01.2006"),
-		c.Popularity,
-		c.VoteAverage,
+		fmt.Sprintf("%.2f", c.Popularity),
+		fmt.Sprintf("%.2f", c.VoteAverage),
 		c.VoteCount,
 		c.Overview,
 	)
@@ -55,7 +69,7 @@ type IDsWithGenreIDs struct {
 	GIDs []int64
 }
 
-func (content Content) GetIDs() []int64 {
+func (content Content) IDs() []int64 {
 	ids := make([]int64, 0, len(content))
 	for _, c := range content {
 		ids = append(ids, c.ID)
@@ -63,7 +77,7 @@ func (content Content) GetIDs() []int64 {
 	return ids
 }
 
-func (content Content) GetIDsWithGenres() []IDsWithGenreIDs {
+func (content Content) IDsWithGenres() []IDsWithGenreIDs {
 	result := make([]IDsWithGenreIDs, 0, len(content))
 
 	for _, c := range content {
@@ -71,6 +85,22 @@ func (content Content) GetIDsWithGenres() []IDsWithGenreIDs {
 			ID:   c.ID,
 			GIDs: c.Genres.GetIDs(),
 		})
+	}
+
+	return result
+}
+
+func (content Content) RemoveByIDs(ids []int64) Content {
+	result := make(Content, 0, len(content))
+	filterMap := make(map[int64]struct{}, len(ids))
+	for _, id := range ids {
+		filterMap[id] = struct{}{}
+	}
+
+	for _, c := range content {
+		if _, ok := filterMap[c.ID]; !ok {
+			result = append(result, c)
+		}
 	}
 
 	return result

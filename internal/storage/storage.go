@@ -10,22 +10,22 @@ import (
 )
 
 type ContentStorer interface {
-	InsertContent(ctx context.Context, contents types.Content) error
-	GetContentStatus(ctx context.Context, userID int64, contentID int64) (types.ContentStatus, error)
+	InsertContent(ctx context.Context, content types.Content) error
+	GetContentStatus(ctx context.Context, userID int64, item types.ContentItem) (types.ContentStatus, error)
 }
 
 type FavoriteContentStorer interface {
-	AddContentItemToFavorite(ctx context.Context, userID int64, contentID int64) error
-	RemoveContentItemFromFavorite(ctx context.Context, userID int64, contentID int64) error
+	AddContentItemToFavorite(ctx context.Context, userID int64, item types.ContentItem) error
+	RemoveContentItemFromFavorite(ctx context.Context, userID int64, item types.ContentItem) error
 
-	GetFavoriteContent(ctx context.Context, userID int64) (types.Content, error)
+	GetFavoriteContentIDs(ctx context.Context, userID int64, contentType types.ContentType) ([]int64, error)
 }
 
 type ViewedContentStorer interface {
-	AddContentItemToViewed(ctx context.Context, userID int64, contentID int64) error
-	RemoveContentItemFromViewed(ctx context.Context, userID int64, contentID int64) error
+	AddContentItemToViewed(ctx context.Context, userID int64, item types.ContentItem) error
+	RemoveContentItemFromViewed(ctx context.Context, userID int64, item types.ContentItem) error
 
-	GetViewedContent(ctx context.Context, userID int64) ([]int64, error)
+	GetViewedContentIDs(ctx context.Context, userID int64, contentType types.ContentType) ([]int64, error)
 }
 
 type UserStorer interface {

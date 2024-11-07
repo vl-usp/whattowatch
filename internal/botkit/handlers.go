@@ -81,23 +81,24 @@ func (t *TGBot) searchHandler(ctx context.Context, b *bot.Bot, update *models.Up
 		return
 	}
 
-	cs, err := t.storer.GetContentStatus(ctx, update.Message.From.ID, contentItem.ID)
+	cs, err := t.storer.GetContentStatus(ctx, update.Message.From.ID, contentItem)
 	if err != nil {
 		log.Error("failed to get content status", "error", err.Error())
 		return
 	}
 
 	kb := inline.New(b).Row()
+	serializedItem := types.SerializeContentItemKey(contentItem)
 	if cs.IsFavorite {
-		kb = kb.Button("Удалить из избранных", []byte(strID), t.onRemoveFavorite)
+		kb = kb.Button("Удалить из избранных", []byte(serializedItem), t.onRemoveFavorite)
 	} else {
-		kb = kb.Button("Добавить в избранные", []byte(strID), t.onAddFavorite)
+		kb = kb.Button("Добавить в избранные", []byte(serializedItem), t.onAddFavorite)
 	}
 
 	if cs.IsViewed {
-		kb = kb.Button("Удалить из просмотренных", []byte(strID), t.onRemoveViewed)
+		kb = kb.Button("Удалить из просмотренных", []byte(serializedItem), t.onRemoveViewed)
 	} else {
-		kb = kb.Button("Добавить в просмотренные", []byte(strID), t.onAddViewed)
+		kb = kb.Button("Добавить в просмотренные", []byte(serializedItem), t.onAddViewed)
 	}
 
 	_, err = b.SendPhoto(ctx, &bot.SendPhotoParams{
@@ -114,13 +115,12 @@ func (t *TGBot) searchHandler(ctx context.Context, b *bot.Bot, update *models.Up
 func (t *TGBot) onAddFavorite(ctx context.Context, b *bot.Bot, mes models.MaybeInaccessibleMessage, data []byte) {
 	log := t.log.With("fn", "onAddFavorite", "user_id", mes.Message.From.ID, "chat_id", mes.Message.Chat.ID)
 
-	id, err := strconv.Atoi(string(data))
+	item, err := types.UnserializeContentItemKey(string(data))
 	if err != nil {
-		log.Error("failed to parse id", "error", err.Error())
-		return
+		log.Error("failed to unserialize item", "error", err.Error())
 	}
 
-	err = t.storer.AddContentItemToFavorite(ctx, mes.Message.Chat.ID, int64(id))
+	err = t.storer.AddContentItemToFavorite(ctx, mes.Message.Chat.ID, item)
 	if err != nil {
 		log.Error("failed to add favorite", "error", err.Error())
 	}
@@ -129,13 +129,12 @@ func (t *TGBot) onAddFavorite(ctx context.Context, b *bot.Bot, mes models.MaybeI
 func (t *TGBot) onRemoveFavorite(ctx context.Context, b *bot.Bot, mes models.MaybeInaccessibleMessage, data []byte) {
 	log := t.log.With("fn", "onRemoveFavorite", "user_id", mes.Message.From.ID, "chat_id", mes.Message.Chat.ID)
 
-	id, err := strconv.Atoi(string(data))
+	item, err := types.UnserializeContentItemKey(string(data))
 	if err != nil {
-		log.Error("failed to parse id", "error", err.Error())
-		return
+		log.Error("failed to unserialize item", "error", err.Error())
 	}
 
-	err = t.storer.RemoveContentItemFromFavorite(ctx, mes.Message.Chat.ID, int64(id))
+	err = t.storer.RemoveContentItemFromFavorite(ctx, mes.Message.Chat.ID, item)
 	if err != nil {
 		log.Error("failed to remove favorite", "error", err.Error())
 	}
@@ -144,13 +143,12 @@ func (t *TGBot) onRemoveFavorite(ctx context.Context, b *bot.Bot, mes models.May
 func (t *TGBot) onAddViewed(ctx context.Context, b *bot.Bot, mes models.MaybeInaccessibleMessage, data []byte) {
 	log := t.log.With("fn", "onAddViewed", "user_id", mes.Message.From.ID, "chat_id", mes.Message.Chat.ID)
 
-	id, err := strconv.Atoi(string(data))
+	item, err := types.UnserializeContentItemKey(string(data))
 	if err != nil {
-		log.Error("failed to parse id", "error", err.Error())
-		return
+		log.Error("failed to unserialize item", "error", err.Error())
 	}
 
-	err = t.storer.AddContentItemToViewed(ctx, mes.Message.Chat.ID, int64(id))
+	err = t.storer.AddContentItemToViewed(ctx, mes.Message.Chat.ID, item)
 	if err != nil {
 		log.Error("failed to add viewed", "error", err.Error())
 	}
@@ -159,13 +157,12 @@ func (t *TGBot) onAddViewed(ctx context.Context, b *bot.Bot, mes models.MaybeIna
 func (t *TGBot) onRemoveViewed(ctx context.Context, b *bot.Bot, mes models.MaybeInaccessibleMessage, data []byte) {
 	log := t.log.With("fn", "onRemoveViewed", "user_id", mes.Message.From.ID, "chat_id", mes.Message.Chat.ID)
 
-	id, err := strconv.Atoi(string(data))
+	item, err := types.UnserializeContentItemKey(string(data))
 	if err != nil {
-		log.Error("failed to parse id", "error", err.Error())
-		return
+		log.Error("failed to unserialize item", "error", err.Error())
 	}
 
-	err = t.storer.RemoveContentItemFromViewed(ctx, mes.Message.Chat.ID, int64(id))
+	err = t.storer.RemoveContentItemFromViewed(ctx, mes.Message.Chat.ID, item)
 	if err != nil {
 		log.Error("failed to remove viewed", "error", err.Error())
 	}
