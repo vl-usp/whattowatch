@@ -1,19 +1,13 @@
 -- +goose Up
 -- +goose StatementBegin
 create table if not exists public.content (
-	id int primary key,
+	id int not null,
 	content_type_id int not null,
 	title text not null,
-	overview text,
 	popularity numeric,
-	poster_path text,
-	release_date date,
-	vote_average numeric,
-	vote_count int,
-	constraint fk_content_content_types_id foreign key (content_type_id) references public.content_types(id) on delete cascade
+	constraint fk_content_content_types_id foreign key (content_type_id) references public.content_types(id) on delete cascade,
+	primary key (id, content_type_id)
 );
-
-create index if not exists content_title_idx on public.content (title);
 -- +goose StatementEnd
 
 -- +goose Down

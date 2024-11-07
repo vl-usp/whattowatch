@@ -10,12 +10,8 @@ import (
 )
 
 type ContentStorer interface {
-	GetContentItem(ctx context.Context, id int64) (types.ContentItem, error)
 	InsertContent(ctx context.Context, contents types.Content) error
 	GetContentStatus(ctx context.Context, userID int64, contentID int64) (types.ContentStatus, error)
-
-	FavoriteContentStorer
-	ViewedContentStorer
 }
 
 type FavoriteContentStorer interface {
@@ -29,14 +25,7 @@ type ViewedContentStorer interface {
 	AddContentItemToViewed(ctx context.Context, userID int64, contentID int64) error
 	RemoveContentItemFromViewed(ctx context.Context, userID int64, contentID int64) error
 
-	GetViewedContent(ctx context.Context, userID int64) (types.Content, error)
-}
-
-type GenreStorer interface {
-	GetGenres(ctx context.Context, contentID int64) (types.Genres, error)
-	GetGenresByIDs(ctx context.Context, ids []int64) (types.Genres, error)
-	InsertGenres(ctx context.Context, genres types.Genres) error
-	InsertContentGenres(ctx context.Context, contentID int64, tmdbGenreIDs []int64) error
+	GetViewedContent(ctx context.Context, userID int64) ([]int64, error)
 }
 
 type UserStorer interface {
@@ -46,8 +35,9 @@ type UserStorer interface {
 
 type Storer interface {
 	ContentStorer
-	GenreStorer
 	UserStorer
+	FavoriteContentStorer
+	ViewedContentStorer
 }
 
 func New(cfg *config.Config, log *slog.Logger) (Storer, error) {

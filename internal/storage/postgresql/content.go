@@ -8,102 +8,34 @@ import (
 	sq "github.com/Masterminds/squirrel"
 )
 
-func (pg *PostgreSQL) GetContentItem(ctx context.Context, id int64) (types.ContentItem, error) {
-	sql, args, err := sq.Select("*").PlaceholderFormat(sq.Dollar).From("content").Where(sq.Eq{"id": id}).ToSql()
-	if err != nil {
-		return types.ContentItem{}, err
-	}
-	var fc types.ContentItem
-	err = pg.conn.QueryRow(ctx, sql, args...).Scan(
-		&fc.ID,
-		&fc.ContentType,
-		&fc.Title,
-		&fc.Overview,
-		&fc.Popularity,
-		&fc.PosterPath,
-		&fc.ReleaseDate,
-		&fc.VoteAverage,
-		&fc.VoteCount,
-	)
-	if err != nil {
-		return types.ContentItem{}, err
-	}
-
-	fc.Genres, err = pg.GetGenres(ctx, fc.ID)
-	if err != nil {
-		return types.ContentItem{}, err
-	}
-
-	return fc, nil
-}
-
 func (pg *PostgreSQL) InsertContent(ctx context.Context, content types.Content) error {
 	contentBuilder := sq.Insert("content").Columns(
 		"id",
 		"content_type_id",
 		"title",
-		"overview",
 		"popularity",
-		"poster_path",
-		"release_date",
-		"vote_average",
-		"vote_count",
 	).PlaceholderFormat(sq.Dollar)
-
-	genresBuilder := sq.Insert("link_content_genres").
-		Columns("content_id", "genre_id").
-		PlaceholderFormat(sq.Dollar)
 
 	for _, c := range content {
 		contentBuilder = contentBuilder.Values(
 			c.ID,
 			c.ContentType.EnumIndex(),
 			c.Title,
-			c.Overview,
 			c.Popularity,
-			c.PosterPath,
-			c.ReleaseDate,
-			c.VoteAverage,
-			c.VoteCount,
 		)
-
-		for _, g := range c.Genres {
-			genresBuilder = genresBuilder.Values(c.ID, g.ID)
-		}
 	}
 
+	// Insert content and genres
 	contentSql, contentArgs, err := contentBuilder.Suffix("ON CONFLICT DO NOTHING").ToSql()
 	if err != nil {
 		return fmt.Errorf("failed to build insert content query: %s", err.Error())
 	}
 
-	genresSql, genresArgs, err := genresBuilder.Suffix("ON CONFLICT DO NOTHING").ToSql()
-	if err != nil {
-		return fmt.Errorf("failed to build insert content genres query: %s", err.Error())
-	}
-
-	tx, err := pg.conn.Begin(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %s", err.Error())
-	}
-	defer tx.Rollback(ctx)
-
-	// Insert content and genres
-	_, err = tx.Exec(ctx, contentSql, contentArgs...)
+	_, err = pg.conn.Exec(ctx, contentSql, contentArgs...)
 	if err != nil {
 		return fmt.Errorf("failed to insert content: %s; data: %v", err.Error(), content)
 	}
 	// pg.log.Debug("content inserted", "type", content[0].ContentType, "ids", content.GetIDsWithGenres())
-
-	_, err = tx.Exec(ctx, genresSql, genresArgs...)
-	if err != nil {
-		return fmt.Errorf("failed to insert content genres: %s; ids: %v; kv-ids: %v", err.Error(), content.GetIDs(), content.GetIDsWithGenres())
-	}
-
-	if err = tx.Commit(ctx); err != nil {
-		return fmt.Errorf("failed to commit transaction: %s", err.Error())
-	}
-
 	return nil
 }
 
@@ -221,7 +153,13 @@ func (pg *PostgreSQL) AddContentItemToViewed(ctx context.Context, userID int64, 
 
 	_, err = pg.conn.Exec(ctx, sql, args...)
 	if err != nil {
-		return fmt.Errorf("failed to insert viewed: %s", err.Error())
+		errCode := ErrorCode(err)
+		if errCode == ForeignKeyViolation || errCode == UniqueViolation {
+			// need add this content before
+			pg.log.Debug("error fetched", "error", err.Error())
+		} else {
+			return fmt.Errorf("failed to insert viewed: %s", err.Error())
+		}
 	}
 	return nil
 }
@@ -239,8 +177,8 @@ func (pg *PostgreSQL) RemoveContentItemFromViewed(ctx context.Context, userID in
 	return nil
 }
 
-func (pg *PostgreSQL) GetViewedContent(ctx context.Context, userID int64) (types.Content, error) {
-	sql, args, err := sq.Select("t1.*").
+func (pg *PostgreSQL) GetViewedContent(ctx context.Context, userID int64) ([]int64, error) {
+	sql, args, err := sq.Select("t1.id").
 		From("content t1").
 		Join("users_viewed t2 ON t1.id = t2.content_id").
 		Where(sq.Eq{"t2.user_id": userID}).ToSql()
@@ -254,20 +192,10 @@ func (pg *PostgreSQL) GetViewedContent(ctx context.Context, userID int64) (types
 	}
 	defer rows.Close()
 
-	content := make(types.Content, 0)
+	content := make([]int64, 0)
 	for rows.Next() {
-		c := types.ContentItem{}
-		err = rows.Scan(
-			&c.ID,
-			&c.ContentType,
-			&c.Title,
-			&c.Overview,
-			&c.Popularity,
-			&c.PosterPath,
-			&c.ReleaseDate,
-			&c.VoteAverage,
-			&c.VoteCount,
-		)
+		var c int64
+		err = rows.Scan(&c)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan row: %s", err.Error())
 		}

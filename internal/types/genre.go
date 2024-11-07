@@ -5,15 +5,11 @@ import (
 )
 
 type Genre struct {
-	ID         int64
-	Name       string
-	PrettyName string
+	ID   int64
+	Name string
 }
 
 func (g Genre) String() string {
-	if g.PrettyName != "" {
-		return g.PrettyName
-	}
 	return g.Name
 }
 

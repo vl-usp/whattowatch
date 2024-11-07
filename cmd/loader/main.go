@@ -3,11 +3,9 @@ package main
 import (
 	"context"
 	"fmt"
-	"io"
-	"net/http"
 	"os/exec"
 	"whattowatch/internal/config"
-	"whattowatch/internal/services/loader"
+	"whattowatch/internal/loader"
 	"whattowatch/internal/storage"
 	"whattowatch/pkg/logger"
 )
@@ -56,20 +54,4 @@ func printIP() {
 
 	// Print the output
 	fmt.Println("current IP is " + string(stdout))
-}
-
-func printData() {
-	resp, err := http.Get("https://api.themoviedb.org/3/movie/11?api_key=12ea487afaad527386fc29d0b058cdbd")
-	if err != nil {
-		// handle err
-	}
-	defer resp.Body.Close()
-
-	// Print the output
-	bodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		fmt.Println(err.Error())
-	}
-	bodyString := string(bodyBytes)
-	fmt.Println(bodyString)
 }

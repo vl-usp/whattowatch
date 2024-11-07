@@ -4,18 +4,21 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"whattowatch/internal/cache"
 	"whattowatch/internal/config"
 	"whattowatch/internal/storage"
 	"whattowatch/internal/types"
 	"whattowatch/internal/utils"
 
 	tmdb "github.com/cyruzin/golang-tmdb"
+	"golang.org/x/sync/errgroup"
 )
 
 type TMDbApi struct {
 	client *tmdb.Client
 	opts   map[string]string
 	storer storage.Storer
+	cache  *cache.Genres
 
 	cfg *config.Config
 	log *slog.Logger
@@ -30,14 +33,48 @@ func New(cfg *config.Config, storer storage.Storer, log *slog.Logger) (*TMDbApi,
 		return nil, err
 	}
 
-	return &TMDbApi{
+	api := &TMDbApi{
 		client: c,
 		opts:   opts,
 		storer: storer,
 
 		cfg: cfg,
 		log: log.With("pkg", "api"),
-	}, nil
+	}
+
+	api.InitGenres()
+	return api, nil
+}
+
+func (a *TMDbApi) InitGenres() error {
+	a.cache = cache.NewGenres()
+
+	g, _ := errgroup.WithContext(context.Background())
+	g.Go(func() error {
+		genres, err := a.client.GetGenreMovieList(a.opts)
+		if err != nil {
+			return err
+		}
+		for _, genre := range genres.Genres {
+			a.cache.SetGenre(int(genre.ID), genre.Name)
+		}
+		return nil
+	})
+
+	g.Go(func() error {
+		tvs, err := a.client.GetGenreTVList(a.opts)
+		if err != nil {
+			return err
+		}
+		for _, genre := range tvs.Genres {
+			a.cache.SetGenre(int(genre.ID), genre.Name)
+		}
+
+		return nil
+	})
+
+	err := g.Wait()
+	return err
 }
 
 func (a *TMDbApi) GetMovie(ctx context.Context, id int) (types.ContentItem, error) {
@@ -52,7 +89,6 @@ func (a *TMDbApi) GetMovie(ctx context.Context, id int) (types.ContentItem, erro
 	}
 
 	genres := make(types.Genres, 0, len(m.Genres))
-
 	for _, genre := range m.Genres {
 		genres = append(genres, types.Genre{ID: genre.ID, Name: genre.Name})
 	}
@@ -168,9 +204,14 @@ func (a *TMDbApi) GetTVPopular(ctx context.Context, page int) (types.Content, er
 			title = v.OriginalName
 		}
 
-		genres, err := a.storer.GetGenresByIDs(ctx, v.GenreIDs)
-		if err != nil {
-			return nil, err
+		genres := make(types.Genres, 0, len(v.GenreIDs))
+		for _, id := range v.GenreIDs {
+			if g, ok := a.cache.GetGenre(int(id)); ok {
+				genres = append(genres, types.Genre{
+					ID:   id,
+					Name: g,
+				})
+			}
 		}
 
 		res = append(res, types.ContentItem{
@@ -257,9 +298,14 @@ func (a *TMDbApi) GetTVTop(ctx context.Context, page int) (types.Content, error)
 			title = v.OriginalName
 		}
 
-		genres, err := a.storer.GetGenresByIDs(ctx, v.GenreIDs)
-		if err != nil {
-			return nil, err
+		genres := make(types.Genres, 0, len(v.GenreIDs))
+		for _, id := range v.GenreIDs {
+			if g, ok := a.cache.GetGenre(int(id)); ok {
+				genres = append(genres, types.Genre{
+					ID:   id,
+					Name: g,
+				})
+			}
 		}
 
 		res = append(res, types.ContentItem{
