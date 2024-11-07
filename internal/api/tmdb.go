@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"whattowatch/internal/cache"
+	"whattowatch/internal/api/cache"
 	"whattowatch/internal/config"
 	"whattowatch/internal/storage"
 	"whattowatch/internal/types"
@@ -18,7 +18,7 @@ type TMDbApi struct {
 	client *tmdb.Client
 	opts   map[string]string
 	storer storage.Storer
-	cache  *cache.Genres
+	cache  *cache.Cache
 
 	cfg *config.Config
 	log *slog.Logger
@@ -42,12 +42,12 @@ func New(cfg *config.Config, storer storage.Storer, log *slog.Logger) (*TMDbApi,
 		log: log.With("pkg", "api"),
 	}
 
-	api.InitGenres()
+	api.initCache()
 	return api, nil
 }
 
-func (a *TMDbApi) InitGenres() error {
-	a.cache = cache.NewGenres()
+func (a *TMDbApi) initCache() error {
+	a.cache = cache.New()
 
 	g, _ := errgroup.WithContext(context.Background())
 	g.Go(func() error {
@@ -56,7 +56,7 @@ func (a *TMDbApi) InitGenres() error {
 			return err
 		}
 		for _, genre := range genres.Genres {
-			a.cache.SetGenre(int(genre.ID), genre.Name)
+			a.cache.Genres.Set(int(genre.ID), genre.Name)
 		}
 		return nil
 	})
@@ -67,7 +67,7 @@ func (a *TMDbApi) InitGenres() error {
 			return err
 		}
 		for _, genre := range tvs.Genres {
-			a.cache.SetGenre(int(genre.ID), genre.Name)
+			a.cache.Genres.Set(int(genre.ID), genre.Name)
 		}
 
 		return nil
@@ -206,7 +206,7 @@ func (a *TMDbApi) GetTVPopular(ctx context.Context, page int) (types.Content, er
 
 		genres := make(types.Genres, 0, len(v.GenreIDs))
 		for _, id := range v.GenreIDs {
-			if g, ok := a.cache.GetGenre(int(id)); ok {
+			if g, ok := a.cache.Genres.Get(int(id)); ok {
 				genres = append(genres, types.Genre{
 					ID:   id,
 					Name: g,
@@ -300,7 +300,7 @@ func (a *TMDbApi) GetTVTop(ctx context.Context, page int) (types.Content, error)
 
 		genres := make(types.Genres, 0, len(v.GenreIDs))
 		for _, id := range v.GenreIDs {
-			if g, ok := a.cache.GetGenre(int(id)); ok {
+			if g, ok := a.cache.Genres.Get(int(id)); ok {
 				genres = append(genres, types.Genre{
 					ID:   id,
 					Name: g,

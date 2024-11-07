@@ -14,26 +14,26 @@ func NewGenres() *Genres {
 	}
 }
 
-func (c *Genres) SetGenre(key int, value string) {
+func (c *Genres) Set(key int, value string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.data[key] = value
 }
 
-func (c *Genres) GetGenre(key int) (string, bool) {
+func (c *Genres) Get(key int) (string, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	value, ok := c.data[key]
 	return value, ok
 }
 
-func (c *Genres) DeleteGenre(key int) {
+func (c *Genres) Delete(key int) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	delete(c.data, key)
 }
 
-func (c *Genres) ClearGenres() {
+func (c *Genres) Clear() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.data = make(map[int]string)
