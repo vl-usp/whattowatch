@@ -10,7 +10,6 @@ import (
 	"github.com/go-telegram/bot/models"
 	"github.com/go-telegram/ui/keyboard/reply"
 	"github.com/go-telegram/ui/slider"
-	"golang.org/x/sync/errgroup"
 )
 
 func (t *TGBot) sendErrorMessage(ctx context.Context, chatID int64) {
@@ -363,40 +362,28 @@ func (t *TGBot) onTVsTopPage(ctx context.Context, b *bot.Bot, mes models.MaybeIn
 func (t *TGBot) onMoviesRecomendations(ctx context.Context, b *bot.Bot, update *models.Update) {
 	log := t.log.With("fn", "onMoviesRecomendations", "user_id", update.Message.From.ID, "chat_id", update.Message.Chat.ID)
 
-	viewedCh := make(chan []int64)
-	favoriteCh := make(chan []int64)
-
-	g, _ := errgroup.WithContext(ctx)
-	g.Go(func() error {
-		viewedIDs, err := t.storer.GetViewedContentIDs(ctx, update.Message.From.ID, types.Movie)
-		if err != nil {
-			log.Error("failed to get user viewed", "error", err.Error())
-			return err
-		}
-		viewedCh <- viewedIDs
-		return err
-	})
-
-	g.Go(func() error {
-		favoriteIDs, err := t.storer.GetFavoriteContentIDs(ctx, update.Message.From.ID, types.Movie)
-		if err != nil {
-			log.Error("failed to get user favorites", "error", err.Error())
-		}
-		favoriteCh <- favoriteIDs
-		return err
-	})
-
-	err := g.Wait()
+	viewedIDs, err := t.storer.GetViewedContentIDs(ctx, update.Message.From.ID, types.Movie)
 	if err != nil {
+		log.Error("failed to get user viewed", "error", err.Error())
+		t.sendErrorMessage(ctx, update.Message.Chat.ID)
 		return
 	}
 
-	recomendations, err := t.api.GetMovieRecomendations(ctx, <-favoriteCh)
+	favoriteIDs, err := t.storer.GetFavoriteContentIDs(ctx, update.Message.From.ID, types.Movie)
 	if err != nil {
-		log.Error("failed to get recomendations", "error", err.Error())
+		log.Error("failed to get user favorites", "error", err.Error())
+		t.sendErrorMessage(ctx, update.Message.Chat.ID)
+		return
 	}
 
-	recomendations = recomendations.RemoveByIDs(<-viewedCh)
+	recomendations, err := t.api.GetMovieRecomendations(ctx, favoriteIDs)
+	if err != nil {
+		log.Error("failed to get recomendations", "error", err.Error())
+		t.sendErrorMessage(ctx, update.Message.Chat.ID)
+		return
+	}
+
+	recomendations = recomendations.RemoveByIDs(viewedIDs)
 	sort.Slice(recomendations, func(i, j int) bool {
 		return recomendations[i].Popularity > recomendations[j].Popularity
 	})
@@ -411,40 +398,26 @@ func (t *TGBot) onMoviesRecomendations(ctx context.Context, b *bot.Bot, update *
 func (t *TGBot) onTVsRecomendations(ctx context.Context, b *bot.Bot, update *models.Update) {
 	log := t.log.With("fn", "onTVsRecomendations", "user_id", update.Message.From.ID, "chat_id", update.Message.Chat.ID)
 
-	viewedCh := make(chan []int64)
-	favoriteCh := make(chan []int64)
-
-	g, _ := errgroup.WithContext(ctx)
-	g.Go(func() error {
-		viewedIDs, err := t.storer.GetViewedContentIDs(ctx, update.Message.From.ID, types.TV)
-		if err != nil {
-			log.Error("failed to get user viewed", "error", err.Error())
-			return err
-		}
-		viewedCh <- viewedIDs
-		return err
-	})
-
-	g.Go(func() error {
-		favoriteIDs, err := t.storer.GetFavoriteContentIDs(ctx, update.Message.From.ID, types.TV)
-		if err != nil {
-			log.Error("failed to get user favorites", "error", err.Error())
-		}
-		favoriteCh <- favoriteIDs
-		return err
-	})
-
-	err := g.Wait()
+	viewedIDs, err := t.storer.GetViewedContentIDs(ctx, update.Message.From.ID, types.TV)
 	if err != nil {
+		log.Error("failed to get user viewed", "error", err.Error())
+		t.sendErrorMessage(ctx, update.Message.Chat.ID)
 		return
 	}
 
-	recomendations, err := t.api.GetTVRecomendations(ctx, <-favoriteCh)
+	favoriteIDs, err := t.storer.GetFavoriteContentIDs(ctx, update.Message.From.ID, types.TV)
+	if err != nil {
+		log.Error("failed to get user favorites", "error", err.Error())
+		t.sendErrorMessage(ctx, update.Message.Chat.ID)
+		return
+	}
+
+	recomendations, err := t.api.GetTVRecomendations(ctx, favoriteIDs)
 	if err != nil {
 		log.Error("failed to get recomendations", "error", err.Error())
 	}
 
-	recomendations = recomendations.RemoveByIDs(<-viewedCh)
+	recomendations = recomendations.RemoveByIDs(viewedIDs)
 	sort.Slice(recomendations, func(i, j int) bool {
 		return recomendations[i].Popularity > recomendations[j].Popularity
 	})
