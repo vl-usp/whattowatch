@@ -46,7 +46,7 @@ func (t *TGBot) generateSlider(content types.Content, opts []slider.Option) *sli
 	slides := make([]slider.Slide, 0, limit)
 
 	for _, r := range content {
-		log.Debug("generating slide", "title", r.Title, "short string", r.ShortString())
+		// log.Debug("generating slide", "title", r.Title, "short string", r.ShortString())
 		slides = append(slides, slider.Slide{
 			Photo: r.PosterPath,
 			Text:  r.ShortString(),

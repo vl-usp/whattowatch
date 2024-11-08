@@ -39,18 +39,21 @@ func (c ContentItem) String() string {
 	if overview == "" {
 		overview = "Описание отсутствует"
 	}
+	if len([]rune(overview)) > 500 {
+		overview = string([]rune(overview)[:500]) + "..."
+	}
 
 	return fmt.Sprintf(
 		"*ID:* /%s%d\n\n*Название:* %s\n\n*Жанры:* %s\n\n*Дата выхода:* %s\n\n*Популярность:* %s\n\n*Рейтинг:* %s\n\n*Количество оценок:* %d\n\n*Описание:* %s",
 		c.ContentType.Sign(),
 		c.ID,
-		utils.EscapeString(c.Title),
+		c.Title,
 		c.Genres.String(),
-		utils.EscapeString(c.ReleaseDate.Time.Format("02.01.2006")),
-		utils.EscapeString(fmt.Sprintf("%.2f", c.Popularity)),
-		utils.EscapeString(fmt.Sprintf("%.2f", c.VoteAverage)),
+		c.ReleaseDate.Time.Format("02.01.2006"),
+		fmt.Sprintf("%.2f", c.Popularity),
+		fmt.Sprintf("%.2f", c.VoteAverage),
 		c.VoteCount,
-		utils.EscapeString(overview),
+		overview,
 	)
 }
 
@@ -58,6 +61,9 @@ func (c ContentItem) ShortString() string {
 	overview := c.Overview
 	if overview == "" {
 		overview = "Описание отсутствует"
+	}
+	if len([]rune(overview)) > 500 {
+		overview = string([]rune(overview)[:500]) + "..."
 	}
 
 	return fmt.Sprintf(
