@@ -48,7 +48,7 @@ func (t *TGBot) helpHandler(ctx context.Context, b *bot.Bot, update *models.Upda
 
 	_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID: update.Message.Chat.ID,
-		Text:   "/start - регистрация\n/menu - открыть меню\n/help - помощь",
+		Text:   "/start - Регистрация\n/menu - Открыть меню\n/search - Поиск по названию. Пример: /search Начало\n/help - Помощь",
 	})
 	if err != nil {
 		log.Error("failed to send message", "error", err.Error())
@@ -61,6 +61,12 @@ func (t *TGBot) searchByTitleHandler(ctx context.Context, b *bot.Bot, update *mo
 	log.Debug("handler func start log")
 
 	titlesStr := strings.Trim(update.Message.Text, "/search ")
+	if titlesStr == "" {
+		t.bot.SendMessage(ctx, &bot.SendMessageParams{
+			ChatID: update.Message.Chat.ID,
+			Text:   "Введите название фильма после команды /search. Пример: /search Начало",
+		})
+	}
 	titles := make([]string, 0)
 	for _, title := range strings.Split(titlesStr, ",") {
 		titles = append(titles, strings.TrimSpace(title))
@@ -70,6 +76,14 @@ func (t *TGBot) searchByTitleHandler(ctx context.Context, b *bot.Bot, update *mo
 	if err != nil {
 		log.Error("failed to get movies", "error", err.Error())
 		t.sendErrorMessage(ctx, update.Message.Chat.ID)
+		return
+	}
+
+	if len(res) == 0 {
+		t.bot.SendMessage(ctx, &bot.SendMessageParams{
+			ChatID: update.Message.Chat.ID,
+			Text:   "Ничего не найдено",
+		})
 		return
 	}
 
