@@ -439,3 +439,127 @@ func (a *TMDbApi) GetTVRecomendations(ctx context.Context, ids []int64) (types.C
 
 	return content, nil
 }
+
+func (a *TMDbApi) SearchMovieByTitle(ctx context.Context, titles []string) (types.Content, error) {
+	log := a.log.With("method", "SearchMovieByTitle")
+
+	content := make(types.Content, 0, len(titles))
+	for _, title := range titles {
+		res, err := a.client.GetSearchMovies(title, a.opts)
+		log.Info("request to TMDb", "title", title)
+		if err != nil {
+			log.Error("request error", "error", err.Error())
+			return nil, err
+		}
+
+		for _, v := range res.Results {
+			if v.Title != title {
+				continue
+			}
+
+			rd, err := utils.GetReleaseDate(v.ReleaseDate)
+			if err != nil {
+				log.Warn("get release date error", "id", v.ID, "error", err.Error())
+				continue
+			}
+
+			poster := a.cfg.Urls.TMDbImageUrl + v.PosterPath
+			if v.PosterPath == "" {
+				log.Warn("empty poster path", "id", v.ID)
+				poster = "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRRT-fEjKFv3PMMg47-olkMSqEDqD42C7ZAsg&s"
+			}
+
+			content = append(content, types.ContentItem{
+				ID:          v.ID,
+				ContentType: types.Movie,
+				Title:       title,
+				Overview:    v.Overview,
+				Popularity:  v.Popularity,
+				PosterPath:  poster,
+				ReleaseDate: rd,
+				VoteAverage: v.VoteAverage,
+				VoteCount:   v.VoteCount,
+			})
+		}
+
+	}
+
+	return content, nil
+}
+
+func (a *TMDbApi) SearchTVByTitle(ctx context.Context, titles []string) (types.Content, error) {
+	log := a.log.With("method", "SearchTVByTitle")
+
+	content := make(types.Content, 0, len(titles))
+	for _, title := range titles {
+		res, err := a.client.GetSearchTVShow(title, a.opts)
+		log.Info("request to TMDb", "title", title)
+		if err != nil {
+			log.Error("request error", "error", err.Error())
+			return nil, err
+		}
+
+		for _, v := range res.Results {
+			if v.Name != title {
+				continue
+			}
+
+			poster := a.cfg.Urls.TMDbImageUrl + v.PosterPath
+			if v.PosterPath == "" {
+				log.Warn("empty poster path", "id", v.ID)
+				poster = "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRRT-fEjKFv3PMMg47-olkMSqEDqD42C7ZAsg&s"
+			}
+
+			rd, err := utils.GetReleaseDate(v.FirstAirDate)
+			if err != nil {
+				log.Warn("get release date error", "id", v.ID, "error", err.Error())
+				continue
+			}
+
+			content = append(content, types.ContentItem{
+				ID:          v.ID,
+				ContentType: types.TV,
+				Title:       title,
+				Overview:    v.Overview,
+				Popularity:  v.Popularity,
+				PosterPath:  poster,
+				ReleaseDate: rd,
+				VoteAverage: v.VoteAverage,
+				VoteCount:   v.VoteCount,
+			})
+		}
+	}
+
+	return content, nil
+}
+
+type result struct {
+	content types.Content
+	err     error
+}
+
+func (a *TMDbApi) SearchByTitles(ctx context.Context, titles []string) (types.Content, error) {
+	moviesCh := make(chan result)
+	tvsCh := make(chan result)
+
+	go func(moviesCh chan result) {
+		movies, err := a.SearchMovieByTitle(ctx, titles)
+		moviesCh <- result{content: movies, err: err}
+	}(moviesCh)
+
+	go func(tvsCh chan result) {
+		tvs, err := a.SearchTVByTitle(ctx, titles)
+		tvsCh <- result{content: tvs, err: err}
+	}(tvsCh)
+
+	movies := <-moviesCh
+	if movies.err != nil {
+		return nil, movies.err
+	}
+	tvs := <-tvsCh
+	if tvs.err != nil {
+		return nil, tvs.err
+	}
+
+	return append(movies.content, tvs.content...), nil
+}

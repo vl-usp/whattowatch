@@ -70,24 +70,26 @@ func NewTGBot(cfg *config.Config, log *slog.Logger, storer storage.Storer) (*TGB
 
 func (t *TGBot) Start() {
 	log := t.log.With("fn", "Start")
-	bot, err := t.bot.GetMe(context.Background())
+	ctx := context.Background()
+	bot, err := t.bot.GetMe(ctx)
 	if err != nil {
 		log.Error("failed to get bot info", "error", err.Error())
 		return
 	}
 	log.Info("starting bot", "bot_id", bot.ID)
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+	ctx, cancel := signal.NotifyContext(ctx, os.Interrupt)
 	defer cancel()
 	t.bot.Start(ctx)
 }
 
 func (t *TGBot) useHandlers() {
-	t.bot.RegisterHandler(bot.HandlerTypeMessageText, "/help", bot.MatchTypePrefix, t.helpHandler)
-	t.bot.RegisterHandler(bot.HandlerTypeMessageText, "/start", bot.MatchTypePrefix, t.registerHandler)
-	t.bot.RegisterHandler(bot.HandlerTypeMessageText, "/menu", bot.MatchTypePrefix, t.handlerReplyKeyboard)
+	t.bot.RegisterHandler(bot.HandlerTypeMessageText, "/help", bot.MatchTypeExact, t.helpHandler)
+	t.bot.RegisterHandler(bot.HandlerTypeMessageText, "/start", bot.MatchTypeExact, t.registerHandler)
+	t.bot.RegisterHandler(bot.HandlerTypeMessageText, "/menu", bot.MatchTypeExact, t.handlerReplyKeyboard)
+	t.bot.RegisterHandler(bot.HandlerTypeMessageText, "/search", bot.MatchTypePrefix, t.searchByTitleHandler)
 
-	t.bot.RegisterHandler(bot.HandlerTypeMessageText, "/f", bot.MatchTypePrefix, t.searchHandler)
-	t.bot.RegisterHandler(bot.HandlerTypeMessageText, "/t", bot.MatchTypePrefix, t.searchHandler)
+	t.bot.RegisterHandler(bot.HandlerTypeMessageText, "/f", bot.MatchTypePrefix, t.searchByIDHandler)
+	t.bot.RegisterHandler(bot.HandlerTypeMessageText, "/t", bot.MatchTypePrefix, t.searchByIDHandler)
 }
 
 func (t *TGBot) userDataMiddleware(next bot.HandlerFunc) bot.HandlerFunc {

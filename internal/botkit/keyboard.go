@@ -53,7 +53,7 @@ func (t *TGBot) generateSlider(content types.Content, opts []slider.Option) *sli
 		})
 	}
 
-	log.Debug("slides generated", "count", len(slides))
+	// log.Debug("slides generated", "count", len(slides))
 
 	if opts == nil {
 		opts = []slider.Option{}
@@ -73,9 +73,9 @@ func (t *TGBot) onMainKeyboard(ctx context.Context, b *bot.Bot, update *models.U
 			reply.WithPrefix("rk_main"),
 			reply.IsSelective(),
 		).
-			Button("Фильмы", b, bot.MatchTypeExact, t.onMoviesKeyboard).
+			Button("Фильмы 🎥", b, bot.MatchTypeExact, t.onMoviesKeyboard).
 			Row().
-			Button("Сериалы", b, bot.MatchTypeExact, t.onTVsKeyboard)
+			Button("Сериалы 📺", b, bot.MatchTypeExact, t.onTVsKeyboard)
 
 		t.mu.Lock()
 		t.userData[update.Message.From.ID] = entry
@@ -106,6 +106,7 @@ func (t *TGBot) onMoviesKeyboard(ctx context.Context, b *bot.Bot, update *models
 			Button("Рекомендации 🎥", b, bot.MatchTypeExact, t.onMoviesRecomendations).
 			Button("Популярные 🎥", b, bot.MatchTypeExact, t.onMoviesPopular).
 			Button("Лучшие 🎥", b, bot.MatchTypeExact, t.onMoviesTop).
+			Row().
 			Button("Избранные 🎥", b, bot.MatchTypeExact, t.onMoviesFavorites).
 			Button("Просмотренные 🎥", b, bot.MatchTypeExact, t.onMoviesViewed).
 			Row().
@@ -140,6 +141,7 @@ func (t *TGBot) onTVsKeyboard(ctx context.Context, b *bot.Bot, update *models.Up
 			Button("Рекомендации 📺", b, bot.MatchTypeExact, t.onTVsRecomendations).
 			Button("Популярные 📺", b, bot.MatchTypeExact, t.onTVsPopular).
 			Button("Лучшие 📺", b, bot.MatchTypeExact, t.onTVsTop).
+			Row().
 			Button("Избранные 📺", b, bot.MatchTypeExact, t.onTVsFavorites).
 			Button("Просмотренные 📺", b, bot.MatchTypeExact, t.onTVsViewed).
 			Row().
@@ -186,6 +188,7 @@ func (t *TGBot) getMoviePopular(ctx context.Context, chatID int64, userData User
 		t.sendErrorMessage(ctx, chatID)
 		return
 	}
+	log.Debug("movies popular received", "count", len(m), "page", userData.popularMoviesPage)
 
 	opts := []slider.Option{
 		slider.OnCancel("Показать еще", true, t.onMoviesPopularPage),
@@ -242,6 +245,7 @@ func (t *TGBot) getTVsPopular(ctx context.Context, chatID int64, userData UserDa
 		t.sendErrorMessage(ctx, chatID)
 		return
 	}
+	log.Debug("tv popular received", "count", len(m), "page", userData.popularTVsPage)
 
 	opts := []slider.Option{
 		slider.OnCancel("Показать еще", true, t.onTVsPopularPage),
@@ -253,14 +257,14 @@ func (t *TGBot) getTVsPopular(ctx context.Context, chatID int64, userData UserDa
 
 func (t *TGBot) onTVsPopularPage(ctx context.Context, b *bot.Bot, mes models.MaybeInaccessibleMessage) {
 	t.mu.RLock()
-	entry, ok := t.userData[mes.Message.From.ID]
+	entry, ok := t.userData[mes.Message.Chat.ID]
 	t.mu.RUnlock()
 
 	if ok {
 		entry.popularTVsPage = utils.HandlePage(entry.popularTVsPage, "next")
 
 		t.mu.Lock()
-		t.userData[mes.Message.From.ID] = entry
+		t.userData[mes.Message.Chat.ID] = entry
 		t.mu.Unlock()
 
 		t.getTVsPopular(ctx, mes.Message.Chat.ID, entry)
@@ -295,6 +299,7 @@ func (t *TGBot) getMoviesTop(ctx context.Context, chatID int64, userData UserDat
 		t.sendErrorMessage(ctx, chatID)
 		return
 	}
+	log.Debug("movies top received", "count", len(m), "page", userData.topMoviePage)
 
 	opts := []slider.Option{
 		slider.OnCancel("Показать еще", true, t.onMoviesTopPage),
@@ -306,14 +311,14 @@ func (t *TGBot) getMoviesTop(ctx context.Context, chatID int64, userData UserDat
 
 func (t *TGBot) onMoviesTopPage(ctx context.Context, b *bot.Bot, mes models.MaybeInaccessibleMessage) {
 	t.mu.RLock()
-	entry, ok := t.userData[mes.Message.From.ID]
+	entry, ok := t.userData[mes.Message.Chat.ID]
 	t.mu.RUnlock()
 
 	if ok {
 		entry.topMoviePage = utils.HandlePage(entry.topMoviePage, "next")
 
 		t.mu.Lock()
-		t.userData[mes.Message.From.ID] = entry
+		t.userData[mes.Message.Chat.ID] = entry
 		t.mu.Unlock()
 
 		t.getMoviesTop(ctx, mes.Message.Chat.ID, entry)
@@ -345,6 +350,7 @@ func (t *TGBot) getTVsTop(ctx context.Context, chatID int64, userData UserData) 
 		t.sendErrorMessage(ctx, chatID)
 		return
 	}
+	log.Debug("tvs top received", "count", len(m), "page", userData.topTVsPage)
 
 	opts := []slider.Option{
 		slider.OnCancel("Показать еще", true, t.onTVsTopPage),
@@ -356,14 +362,14 @@ func (t *TGBot) getTVsTop(ctx context.Context, chatID int64, userData UserData) 
 
 func (t *TGBot) onTVsTopPage(ctx context.Context, b *bot.Bot, mes models.MaybeInaccessibleMessage) {
 	t.mu.RLock()
-	entry, ok := t.userData[mes.Message.From.ID]
+	entry, ok := t.userData[mes.Message.Chat.ID]
 	t.mu.RUnlock()
 
 	if ok {
 		entry.topTVsPage = utils.HandlePage(entry.topTVsPage, "next")
 
 		t.mu.Lock()
-		t.userData[mes.Message.From.ID] = entry
+		t.userData[mes.Message.Chat.ID] = entry
 		t.mu.Unlock()
 
 		t.getTVsTop(ctx, mes.Message.Chat.ID, entry)

@@ -4,12 +4,14 @@ import (
 	"context"
 	"database/sql"
 	"strconv"
+	"strings"
 	"time"
 	"whattowatch/internal/types"
 
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
 	"github.com/go-telegram/ui/keyboard/inline"
+	"github.com/go-telegram/ui/slider"
 )
 
 func (t *TGBot) registerHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
@@ -54,7 +56,31 @@ func (t *TGBot) helpHandler(ctx context.Context, b *bot.Bot, update *models.Upda
 	}
 }
 
-func (t *TGBot) searchHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
+func (t *TGBot) searchByTitleHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
+	log := t.log.With("fn", "searchByTitleHandler", "user_id", update.Message.From.ID, "chat_id", update.Message.Chat.ID)
+	log.Debug("handler func start log")
+
+	titlesStr := strings.Trim(update.Message.Text, "/search ")
+	titles := make([]string, 0)
+	for _, title := range strings.Split(titlesStr, ",") {
+		titles = append(titles, strings.TrimSpace(title))
+	}
+
+	res, err := t.api.SearchByTitles(ctx, titles)
+	if err != nil {
+		log.Error("failed to get movies", "error", err.Error())
+		t.sendErrorMessage(ctx, update.Message.Chat.ID)
+		return
+	}
+
+	opts := []slider.Option{
+		slider.WithPrefix("slider_movie_search"),
+	}
+	sl := t.generateSlider(res, opts)
+	sl.Show(ctx, b, update.Message.Chat.ID)
+}
+
+func (t *TGBot) searchByIDHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
 	log := t.log.With("fn", "searchHandler", "user_id", update.Message.From.ID, "chat_id", update.Message.Chat.ID)
 	log.Debug("handler func start log")
 

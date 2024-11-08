@@ -39,9 +39,9 @@ func (c ContentItem) String() string {
 	if overview == "" {
 		overview = "Описание отсутствует"
 	}
-	if len([]rune(overview)) > 500 {
-		overview = string([]rune(overview)[:500]) + "..."
-	}
+	// if len([]rune(overview)) > 500 {
+	// 	overview = string([]rune(overview)[:500]) + "..."
+	// }
 
 	return fmt.Sprintf(
 		"*ID:* /%s%d\n\n*Название:* %s\n\n*Жанры:* %s\n\n*Дата выхода:* %s\n\n*Популярность:* %s\n\n*Рейтинг:* %s\n\n*Количество оценок:* %d\n\n*Описание:* %s",
