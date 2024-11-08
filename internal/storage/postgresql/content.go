@@ -122,8 +122,8 @@ func (pg *PostgreSQL) RemoveContentItemFromFavorite(ctx context.Context, userID 
 func (pg *PostgreSQL) GetFavoriteContentIDs(ctx context.Context, userID int64, contentType types.ContentType) ([]int64, error) {
 	sql, args, err := sq.Select("t1.id").
 		From("content t1").
-		Join("users_favorites t2 ON t1.id = t2.content_id").
-		Where(sq.And{sq.Eq{"t2.user_id": userID}, sq.Eq{"t1.content_type_id": contentType.ID()}}).
+		Join("users_favorites t2 ON t1.id = t2.content_id and t1.content_type_id = t2.content_type_id").
+		Where(sq.Eq{"t2.user_id": userID, "t1.content_type_id": contentType.ID()}).
 		PlaceholderFormat(sq.Dollar).ToSql()
 	if err != nil {
 		return nil, fmt.Errorf("failed to build sql query: %s", err.Error())
@@ -187,7 +187,7 @@ func (pg *PostgreSQL) RemoveContentItemFromViewed(ctx context.Context, userID in
 func (pg *PostgreSQL) GetViewedContentIDs(ctx context.Context, userID int64, contentType types.ContentType) ([]int64, error) {
 	sql, args, err := sq.Select("t1.id").
 		From("content t1").
-		Join("users_viewed t2 ON t1.id = t2.content_id").
+		Join("users_viewed t2 ON t1.id = t2.content_id and t1.content_type_id = t2.content_type_id").
 		Where(sq.Eq{"t2.user_id": userID, "t1.content_type_id": contentType.ID()}).
 		PlaceholderFormat(sq.Dollar).ToSql()
 	if err != nil {

@@ -96,6 +96,7 @@ func (t *TGBot) onMoviesKeyboard(ctx context.Context, b *bot.Bot, update *models
 			Button("Рекомендации 🎥", b, bot.MatchTypeExact, t.onMoviesRecomendations).
 			Button("Популярные 🎥", b, bot.MatchTypeExact, t.onMoviesPopular).
 			Button("Лучшие 🎥", b, bot.MatchTypeExact, t.onMoviesTop).
+			Button("Избранные 🎥", b, bot.MatchTypeExact, t.onMoviesFavorites).
 			Button("Просмотренные 🎥", b, bot.MatchTypeExact, t.onMoviesViewed).
 			Row().
 			Button("🔙 Назад", b, bot.MatchTypePrefix, t.onMainKeyboard)
@@ -129,6 +130,7 @@ func (t *TGBot) onTVsKeyboard(ctx context.Context, b *bot.Bot, update *models.Up
 			Button("Рекомендации 📺", b, bot.MatchTypeExact, t.onTVsRecomendations).
 			Button("Популярные 📺", b, bot.MatchTypeExact, t.onTVsPopular).
 			Button("Лучшие 📺", b, bot.MatchTypeExact, t.onTVsTop).
+			Button("Избранные 📺", b, bot.MatchTypeExact, t.onTVsFavorites).
 			Button("Просмотренные 📺", b, bot.MatchTypeExact, t.onTVsViewed).
 			Row().
 			Button("🔙 Назад", b, bot.MatchTypePrefix, t.onMainKeyboard)
@@ -429,6 +431,67 @@ func (t *TGBot) onTVsRecomendations(ctx context.Context, b *bot.Bot, update *mod
 	sl.Show(ctx, b, update.Message.Chat.ID)
 }
 
+// FAVORITES
+func (t *TGBot) onMoviesFavorites(ctx context.Context, b *bot.Bot, update *models.Update) {
+	log := t.log.With("fn", "onMoviesFavorites", "user_id", update.Message.From.ID, "chat_id", update.Message.Chat.ID)
+	ids, err := t.storer.GetFavoriteContentIDs(ctx, update.Message.From.ID, types.Movie)
+	if err != nil {
+		log.Error("failed to get favorites", "error", err.Error())
+		t.sendErrorMessage(ctx, update.Message.Chat.ID)
+		return
+	}
+	if len(ids) == 0 {
+		t.bot.SendMessage(ctx, &bot.SendMessageParams{
+			ChatID: update.Message.Chat.ID,
+			Text:   "У вас нет избранных фильмов",
+		})
+		return
+	}
+
+	m, err := t.api.GetMovies(ctx, ids)
+	if err != nil {
+		log.Error("failed to get movies", "error", err.Error())
+		t.sendErrorMessage(ctx, update.Message.Chat.ID)
+		return
+	}
+
+	opts := []slider.Option{
+		slider.WithPrefix("slider_movie_favorites"),
+	}
+	sl := t.generateSlider(m, opts)
+	sl.Show(ctx, b, update.Message.Chat.ID)
+}
+
+func (t *TGBot) onTVsFavorites(ctx context.Context, b *bot.Bot, update *models.Update) {
+	log := t.log.With("fn", "onTVsFavorites", "user_id", update.Message.From.ID, "chat_id", update.Message.Chat.ID)
+	ids, err := t.storer.GetFavoriteContentIDs(ctx, update.Message.From.ID, types.TV)
+	if err != nil {
+		log.Error("failed to get favorites", "error", err.Error())
+		t.sendErrorMessage(ctx, update.Message.Chat.ID)
+		return
+	}
+	if len(ids) == 0 {
+		t.bot.SendMessage(ctx, &bot.SendMessageParams{
+			ChatID: update.Message.Chat.ID,
+			Text:   "У вас нет избранных сериалов",
+		})
+		return
+	}
+
+	m, err := t.api.GetTVs(ctx, ids)
+	if err != nil {
+		log.Error("failed to get tvs", "error", err.Error())
+		t.sendErrorMessage(ctx, update.Message.Chat.ID)
+		return
+	}
+
+	opts := []slider.Option{
+		slider.WithPrefix("slider_tv_favorites"),
+	}
+	sl := t.generateSlider(m, opts)
+	sl.Show(ctx, b, update.Message.Chat.ID)
+}
+
 // VIEWED
 func (t *TGBot) onMoviesViewed(ctx context.Context, b *bot.Bot, update *models.Update) {
 	log := t.log.With("fn", "onMoviesViewed", "user_id", update.Message.From.ID, "chat_id", update.Message.Chat.ID)
@@ -436,6 +499,13 @@ func (t *TGBot) onMoviesViewed(ctx context.Context, b *bot.Bot, update *models.U
 	if err != nil {
 		log.Error("failed to get viewed", "error", err.Error())
 		t.sendErrorMessage(ctx, update.Message.Chat.ID)
+		return
+	}
+	if len(ids) == 0 {
+		t.bot.SendMessage(ctx, &bot.SendMessageParams{
+			ChatID: update.Message.Chat.ID,
+			Text:   "У вас нет просмотренных фильмов",
+		})
 		return
 	}
 
@@ -461,10 +531,17 @@ func (t *TGBot) onTVsViewed(ctx context.Context, b *bot.Bot, update *models.Upda
 		t.sendErrorMessage(ctx, update.Message.Chat.ID)
 		return
 	}
+	if len(ids) == 0 {
+		t.bot.SendMessage(ctx, &bot.SendMessageParams{
+			ChatID: update.Message.Chat.ID,
+			Text:   "У вас нет просмотренных сериалов",
+		})
+		return
+	}
 
 	m, err := t.api.GetTVs(ctx, ids)
 	if err != nil {
-		log.Error("failed to get movies", "error", err.Error())
+		log.Error("failed to get tvs", "error", err.Error())
 		t.sendErrorMessage(ctx, update.Message.Chat.ID)
 		return
 	}
