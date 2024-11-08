@@ -25,13 +25,7 @@ type TMDbApi struct {
 	log *slog.Logger
 }
 
-type recomendationsJob struct {
-	movies *tmdb.MovieRecommendations
-	tvs    *tmdb.TVRecommendations
-	err    error
-}
-
-var workerCnt = 10
+var recomendationDateFrom = "2012-01-01"
 
 func New(cfg *config.Config, storer storage.Storer, log *slog.Logger) (*TMDbApi, error) {
 	opts := make(map[string]string)
@@ -65,7 +59,7 @@ func (a *TMDbApi) initCache() error {
 			return err
 		}
 		for _, genre := range genres.Genres {
-			a.cache.Genres.Set(int(genre.ID), genre.Name)
+			a.cache.Genres.Set(genre.ID, genre.Name)
 		}
 		return nil
 	})
@@ -76,7 +70,7 @@ func (a *TMDbApi) initCache() error {
 			return err
 		}
 		for _, genre := range tvs.Genres {
-			a.cache.Genres.Set(int(genre.ID), genre.Name)
+			a.cache.Genres.Set(genre.ID, genre.Name)
 		}
 
 		return nil
@@ -84,6 +78,20 @@ func (a *TMDbApi) initCache() error {
 
 	err := g.Wait()
 	return err
+}
+
+func (a *TMDbApi) getGenresByIDs(ids []int64) types.Genres {
+	genres := make(types.Genres, 0, len(ids))
+	for _, id := range ids {
+		if g, ok := a.cache.Genres.Get(id); ok {
+			genres = append(genres, types.Genre{
+				ID:   id,
+				Name: g,
+			})
+		}
+	}
+
+	return genres
 }
 
 func (a *TMDbApi) GetMovie(ctx context.Context, id int) (types.ContentItem, error) {
@@ -114,6 +122,36 @@ func (a *TMDbApi) GetMovie(ctx context.Context, id int) (types.ContentItem, erro
 		VoteCount:   m.VoteCount,
 		Genres:      genres,
 	}, nil
+}
+
+func (a *TMDbApi) GetMovies(ctx context.Context, ids []int64) (types.Content, error) {
+	content := make(types.Content, 0, len(ids))
+
+	for i := 0; i < len(ids); i++ {
+		id := int(ids[i])
+		m, err := a.GetMovie(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		content = append(content, m)
+	}
+
+	return content, nil
+}
+
+func (a *TMDbApi) GetTVs(ctx context.Context, ids []int64) (types.Content, error) {
+	content := make(types.Content, 0, len(ids))
+
+	for i := 0; i < len(ids); i++ {
+		id := int(ids[i])
+		m, err := a.GetTV(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		content = append(content, m)
+	}
+
+	return content, nil
 }
 
 func (a *TMDbApi) GetTV(ctx context.Context, id int) (types.ContentItem, error) {
@@ -167,14 +205,6 @@ func (a *TMDbApi) GetMoviesPopular(ctx context.Context, page int) (types.Content
 			title = v.OriginalTitle
 		}
 
-		genres := make(types.Genres, 0, len(v.Genres))
-		for _, g := range v.Genres {
-			genres = append(genres, types.Genre{
-				ID:   g.ID,
-				Name: g.Name,
-			})
-		}
-
 		res = append(res, types.ContentItem{
 			ID:          v.ID,
 			ContentType: types.Movie,
@@ -185,7 +215,6 @@ func (a *TMDbApi) GetMoviesPopular(ctx context.Context, page int) (types.Content
 			ReleaseDate: rd,
 			VoteAverage: v.VoteAverage,
 			VoteCount:   v.VoteCount,
-			Genres:      genres,
 		})
 	}
 
@@ -213,16 +242,6 @@ func (a *TMDbApi) GetTVPopular(ctx context.Context, page int) (types.Content, er
 			title = v.OriginalName
 		}
 
-		genres := make(types.Genres, 0, len(v.GenreIDs))
-		for _, id := range v.GenreIDs {
-			if g, ok := a.cache.Genres.Get(int(id)); ok {
-				genres = append(genres, types.Genre{
-					ID:   id,
-					Name: g,
-				})
-			}
-		}
-
 		res = append(res, types.ContentItem{
 			ID:          v.ID,
 			ContentType: types.TV,
@@ -233,7 +252,6 @@ func (a *TMDbApi) GetTVPopular(ctx context.Context, page int) (types.Content, er
 			ReleaseDate: rd,
 			VoteAverage: v.VoteAverage,
 			VoteCount:   v.VoteCount,
-			Genres:      genres,
 		})
 	}
 
@@ -261,14 +279,6 @@ func (a *TMDbApi) GetMovieTop(ctx context.Context, page int) (types.Content, err
 			title = v.OriginalTitle
 		}
 
-		genres := make(types.Genres, 0, len(v.Genres))
-		for _, g := range v.Genres {
-			genres = append(genres, types.Genre{
-				ID:   g.ID,
-				Name: g.Name,
-			})
-		}
-
 		res = append(res, types.ContentItem{
 			ID:          v.ID,
 			ContentType: types.Movie,
@@ -279,7 +289,6 @@ func (a *TMDbApi) GetMovieTop(ctx context.Context, page int) (types.Content, err
 			ReleaseDate: rd,
 			VoteAverage: v.VoteAverage,
 			VoteCount:   v.VoteCount,
-			Genres:      genres,
 		})
 	}
 
@@ -307,16 +316,6 @@ func (a *TMDbApi) GetTVTop(ctx context.Context, page int) (types.Content, error)
 			title = v.OriginalName
 		}
 
-		genres := make(types.Genres, 0, len(v.GenreIDs))
-		for _, id := range v.GenreIDs {
-			if g, ok := a.cache.Genres.Get(int(id)); ok {
-				genres = append(genres, types.Genre{
-					ID:   id,
-					Name: g,
-				})
-			}
-		}
-
 		res = append(res, types.ContentItem{
 			ID:          v.ID,
 			ContentType: types.TV,
@@ -327,7 +326,6 @@ func (a *TMDbApi) GetTVTop(ctx context.Context, page int) (types.Content, error)
 			ReleaseDate: rd,
 			VoteAverage: v.VoteAverage,
 			VoteCount:   v.VoteCount,
-			Genres:      genres,
 		})
 	}
 
@@ -360,7 +358,7 @@ func (a *TMDbApi) GetMovieRecomendations(ctx context.Context, ids []int64) (type
 				continue
 			}
 
-			filterTime, err := time.Parse("2006-01-02", "2012-01-01")
+			filterTime, err := time.Parse("2006-01-02", recomendationDateFrom)
 			if err != nil {
 				log.Error("parse filter date error", "error", err.Error())
 				continue
@@ -380,6 +378,7 @@ func (a *TMDbApi) GetMovieRecomendations(ctx context.Context, ids []int64) (type
 				ReleaseDate: rd,
 				VoteAverage: v.VoteAverage,
 				VoteCount:   v.VoteCount,
+				Genres:      a.getGenresByIDs(v.GenreIDs),
 			})
 		}
 	}
@@ -388,48 +387,44 @@ func (a *TMDbApi) GetMovieRecomendations(ctx context.Context, ids []int64) (type
 }
 
 func (a *TMDbApi) GetTVRecomendations(ctx context.Context, ids []int64) (types.Content, error) {
-	jobs := make(chan int, len(ids))
-	resJobs := make(chan recomendationsJob, len(ids))
+	log := a.log.With("method", "GetTVRecomendations")
+
 	content := make(types.Content, 0, len(ids))
-	defer close(resJobs)
-
-	for i := 0; i < workerCnt; i++ {
-		go func() {
-			for id := range jobs {
-				a.opts["page"] = "1"
-				res, err := a.client.GetTVRecommendations(id, a.opts)
-				if err != nil {
-					resJobs <- recomendationsJob{err: err}
-					continue
-				}
-				resJobs <- recomendationsJob{tvs: res}
-			}
-		}()
-	}
 
 	for i := 0; i < len(ids); i++ {
-		jobs <- int(ids[i])
-	}
-	close(jobs)
-
-	for i := 0; i < len(ids); i++ {
-		res := <-resJobs
-		if res.err == nil {
-			return nil, res.err
+		id := int(ids[i])
+		a.opts["page"] = "1"
+		res, err := a.client.GetTVRecommendations(id, a.opts)
+		log.Info("request to TMDb", "id", id)
+		if err != nil {
+			return nil, err
 		}
-		for _, v := range res.tvs.Results {
+
+		for _, v := range res.Results {
 			if v.Overview == "" {
+				log.Warn("empty overview", "id", v.ID)
 				continue
 			}
 
 			rd, err := utils.GetReleaseDate(v.FirstAirDate)
 			if err != nil {
+				log.Error("get release date error", "id", v.ID, "error", err.Error())
+				continue
+			}
+
+			filterTime, err := time.Parse("2006-01-02", recomendationDateFrom)
+			if err != nil {
+				log.Error("parse filter date error", "error", err.Error())
+				continue
+			}
+
+			if rd.Time.Before(filterTime) {
 				continue
 			}
 
 			content = append(content, types.ContentItem{
 				ID:          v.ID,
-				ContentType: types.TV,
+				ContentType: types.Movie,
 				Title:       v.Name,
 				Overview:    v.Overview,
 				Popularity:  v.Popularity,
@@ -437,6 +432,7 @@ func (a *TMDbApi) GetTVRecomendations(ctx context.Context, ids []int64) (types.C
 				ReleaseDate: rd,
 				VoteAverage: v.VoteAverage,
 				VoteCount:   v.VoteCount,
+				Genres:      a.getGenresByIDs(v.GenreIDs),
 			})
 		}
 	}

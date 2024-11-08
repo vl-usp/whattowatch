@@ -10,7 +10,7 @@ import (
 func EscapeString(s string) string {
 	m := map[string]string{
 		"_": "\\_",
-		"*": "\\*",
+		// "*": "\\*",
 		"[": "\\[",
 		"]": "\\]",
 		"(": "\\(",

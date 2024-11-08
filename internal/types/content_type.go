@@ -25,3 +25,13 @@ func ParseContentType(s string) (ContentType, error) {
 func (w ContentType) ID() int {
 	return int(w)
 }
+
+func (w ContentType) Sign() string {
+	switch w {
+	case Movie:
+		return "f"
+	case TV:
+		return "t"
+	}
+	return ""
+}

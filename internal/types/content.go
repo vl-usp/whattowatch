@@ -35,7 +35,8 @@ func UnserializeContentItemKey(str string) (ContentItem, error) {
 
 func (c ContentItem) String() string {
 	return fmt.Sprintf(
-		"ID: /f%d\nНазвание: %s\nЖанры: %s\nДата выхода: %s\nПопулярность: %s\nРейтинг: %s\nКоличество оценок: %d\nОписание: %s",
+		"*ID:* /%s%d\n\n*Название:* %s\n\n*Жанры:* %s\n\n*Дата выхода:* %s\n\n*Популярность:* %s\n\n*Рейтинг:* %s\n\n*Количество оценок:* %d\n\n*Описание:* %s",
+		c.ContentType.Sign(),
 		c.ID,
 		c.Title,
 		c.Genres.String(),
@@ -43,6 +44,18 @@ func (c ContentItem) String() string {
 		fmt.Sprintf("%.2f", c.Popularity),
 		fmt.Sprintf("%.2f", c.VoteAverage),
 		c.VoteCount,
+		c.Overview,
+	)
+}
+
+func (c ContentItem) ShortString() string {
+	return fmt.Sprintf(
+		"*ID:* /%s%d\n\n*Название:* %s\n\n*Дата выхода:* %s\n\n*Рейтинг:* %s\n\n*Описание:* %s",
+		c.ContentType.Sign(),
+		c.ID,
+		c.Title,
+		c.ReleaseDate.Time.Format("02.01.2006"),
+		fmt.Sprintf("%.2f", c.VoteAverage),
 		c.Overview,
 	)
 }

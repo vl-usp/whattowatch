@@ -25,13 +25,7 @@ func (t *TGBot) registerHandler(ctx context.Context, b *bot.Bot, update *models.
 	})
 	if err != nil {
 		log.Error("failed to insert user", "error", err.Error())
-		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
-			ChatID: update.Message.Chat.ID,
-			Text:   "Произошла ошибка. Попробуйте позже.",
-		})
-		if err != nil {
-			log.Error("failed to send message", "error", err.Error())
-		}
+		t.sendErrorMessage(ctx, update.Message.Chat.ID)
 		return
 	}
 
@@ -41,6 +35,7 @@ func (t *TGBot) registerHandler(ctx context.Context, b *bot.Bot, update *models.
 	})
 	if err != nil {
 		log.Error("failed to send message", "error", err.Error())
+		t.sendErrorMessage(ctx, update.Message.Chat.ID)
 	}
 	log.Info("user registered")
 }
@@ -55,6 +50,7 @@ func (t *TGBot) helpHandler(ctx context.Context, b *bot.Bot, update *models.Upda
 	})
 	if err != nil {
 		log.Error("failed to send message", "error", err.Error())
+		t.sendErrorMessage(ctx, update.Message.Chat.ID)
 	}
 }
 
@@ -67,6 +63,8 @@ func (t *TGBot) searchHandler(ctx context.Context, b *bot.Bot, update *models.Up
 	id, err := strconv.Atoi(strID)
 	if err != nil {
 		log.Error("failed to parse id", "error", err.Error())
+		t.sendErrorMessage(ctx, update.Message.Chat.ID)
+		return
 	}
 	var contentItem types.ContentItem
 
@@ -78,12 +76,14 @@ func (t *TGBot) searchHandler(ctx context.Context, b *bot.Bot, update *models.Up
 	}
 	if err != nil {
 		log.Error("failed to get content item", "error", err.Error())
+		t.sendErrorMessage(ctx, update.Message.Chat.ID)
 		return
 	}
 
 	cs, err := t.storer.GetContentStatus(ctx, update.Message.From.ID, contentItem)
 	if err != nil {
 		log.Error("failed to get content status", "error", err.Error())
+		t.sendErrorMessage(ctx, update.Message.Chat.ID)
 		return
 	}
 
@@ -105,10 +105,12 @@ func (t *TGBot) searchHandler(ctx context.Context, b *bot.Bot, update *models.Up
 		ChatID:      update.Message.Chat.ID,
 		Photo:       &models.InputFileString{Data: contentItem.PosterPath},
 		Caption:     contentItem.String(),
+		ParseMode:   "Markdown",
 		ReplyMarkup: kb,
 	})
 	if err != nil {
 		log.Error("failed to send message", "error", err.Error())
+		t.sendErrorMessage(ctx, update.Message.Chat.ID)
 	}
 }
 
@@ -118,11 +120,14 @@ func (t *TGBot) onAddFavorite(ctx context.Context, b *bot.Bot, mes models.MaybeI
 	item, err := types.UnserializeContentItemKey(string(data))
 	if err != nil {
 		log.Error("failed to unserialize item", "error", err.Error())
+		t.sendErrorMessage(ctx, mes.Message.Chat.ID)
+		return
 	}
 
 	err = t.storer.AddContentItemToFavorite(ctx, mes.Message.Chat.ID, item)
 	if err != nil {
 		log.Error("failed to add favorite", "error", err.Error())
+		t.sendErrorMessage(ctx, mes.Message.Chat.ID)
 	}
 }
 
@@ -132,11 +137,14 @@ func (t *TGBot) onRemoveFavorite(ctx context.Context, b *bot.Bot, mes models.May
 	item, err := types.UnserializeContentItemKey(string(data))
 	if err != nil {
 		log.Error("failed to unserialize item", "error", err.Error())
+		t.sendErrorMessage(ctx, mes.Message.Chat.ID)
+		return
 	}
 
 	err = t.storer.RemoveContentItemFromFavorite(ctx, mes.Message.Chat.ID, item)
 	if err != nil {
 		log.Error("failed to remove favorite", "error", err.Error())
+		t.sendErrorMessage(ctx, mes.Message.Chat.ID)
 	}
 }
 
@@ -146,11 +154,14 @@ func (t *TGBot) onAddViewed(ctx context.Context, b *bot.Bot, mes models.MaybeIna
 	item, err := types.UnserializeContentItemKey(string(data))
 	if err != nil {
 		log.Error("failed to unserialize item", "error", err.Error())
+		t.sendErrorMessage(ctx, mes.Message.Chat.ID)
+		return
 	}
 
 	err = t.storer.AddContentItemToViewed(ctx, mes.Message.Chat.ID, item)
 	if err != nil {
 		log.Error("failed to add viewed", "error", err.Error())
+		t.sendErrorMessage(ctx, mes.Message.Chat.ID)
 	}
 }
 
@@ -160,10 +171,13 @@ func (t *TGBot) onRemoveViewed(ctx context.Context, b *bot.Bot, mes models.Maybe
 	item, err := types.UnserializeContentItemKey(string(data))
 	if err != nil {
 		log.Error("failed to unserialize item", "error", err.Error())
+		t.sendErrorMessage(ctx, mes.Message.Chat.ID)
+		return
 	}
 
 	err = t.storer.RemoveContentItemFromViewed(ctx, mes.Message.Chat.ID, item)
 	if err != nil {
 		log.Error("failed to remove viewed", "error", err.Error())
+		t.sendErrorMessage(ctx, mes.Message.Chat.ID)
 	}
 }

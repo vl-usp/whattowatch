@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"sync"
 	"whattowatch/internal/api"
 	"whattowatch/internal/config"
 	"whattowatch/internal/storage"
@@ -33,6 +34,7 @@ type TGBot struct {
 	cfg *config.Config
 
 	userData map[int64]UserData
+	mu       sync.RWMutex
 }
 
 func NewTGBot(cfg *config.Config, log *slog.Logger, storer storage.Storer) (*TGBot, error) {
@@ -99,7 +101,11 @@ func (t *TGBot) userDataMiddleware(next bot.HandlerFunc) bot.HandlerFunc {
 			id = update.Message.From.ID
 		}
 
-		if entry, ok := t.userData[id]; !ok {
+		t.mu.RLock()
+		entry, ok := t.userData[id]
+		t.mu.RUnlock()
+
+		if !ok {
 			log.Debug("init user data", "userID", id)
 
 			rk := reply.New(
@@ -108,6 +114,7 @@ func (t *TGBot) userDataMiddleware(next bot.HandlerFunc) bot.HandlerFunc {
 				reply.IsSelective(),
 			).
 				Button("Фильмы", b, bot.MatchTypeExact, t.onMoviesKeyboard).
+				Row().
 				Button("Сериалы", b, bot.MatchTypeExact, t.onTVsKeyboard)
 
 			ud := UserData{
@@ -120,7 +127,9 @@ func (t *TGBot) userDataMiddleware(next bot.HandlerFunc) bot.HandlerFunc {
 				topTVsPage:     1,
 			}
 
+			t.mu.Lock()
 			t.userData[id] = ud
+			t.mu.Unlock()
 
 			b.SendMessage(ctx, &bot.SendMessageParams{
 				ChatID:      id,
