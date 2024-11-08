@@ -424,7 +424,7 @@ func (a *TMDbApi) GetTVRecomendations(ctx context.Context, ids []int64) (types.C
 
 			content = append(content, types.ContentItem{
 				ID:          v.ID,
-				ContentType: types.Movie,
+				ContentType: types.TV,
 				Title:       v.Name,
 				Overview:    v.Overview,
 				Popularity:  v.Popularity,

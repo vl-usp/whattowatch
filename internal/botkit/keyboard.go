@@ -35,15 +35,25 @@ func (t *TGBot) handlerReplyKeyboard(ctx context.Context, b *bot.Bot, update *mo
 
 func (t *TGBot) generateSlider(content types.Content, opts []slider.Option) *slider.Slider {
 	log := t.log.With("fn", "generateSlider")
-	log.Info("generating slides", "recomendations", len(content))
-	slides := make([]slider.Slide, 0, len(content))
+	log.Info("generating slides", "count", len(content))
+
+	limit := 50
+	if len(content) > limit {
+		log.Warn("too many slides.", "limit", limit, "count", len(content))
+		content = content[:limit]
+	}
+
+	slides := make([]slider.Slide, 0, limit)
 
 	for _, r := range content {
+		log.Debug("generating slide", "title", r.Title, "short string", r.ShortString())
 		slides = append(slides, slider.Slide{
 			Photo: r.PosterPath,
-			Text:  utils.EscapeString(r.ShortString()),
+			Text:  r.ShortString(),
 		})
 	}
+
+	log.Debug("slides generated", "count", len(slides))
 
 	if opts == nil {
 		opts = []slider.Option{}
@@ -385,10 +395,18 @@ func (t *TGBot) onMoviesRecomendations(ctx context.Context, b *bot.Bot, update *
 		return
 	}
 
-	recomendations = recomendations.RemoveByIDs(viewedIDs)
+	recomendations = recomendations.RemoveByIDs(viewedIDs).RemoveDuplicates()
 	sort.Slice(recomendations, func(i, j int) bool {
 		return recomendations[i].Popularity > recomendations[j].Popularity
 	})
+
+	if len(recomendations) == 0 {
+		t.bot.SendMessage(ctx, &bot.SendMessageParams{
+			ChatID: update.Message.Chat.ID,
+			Text:   "У вас нет рекомендаций",
+		})
+		return
+	}
 
 	opts := []slider.Option{
 		slider.WithPrefix("slider_movie_recomendations"),
@@ -419,10 +437,18 @@ func (t *TGBot) onTVsRecomendations(ctx context.Context, b *bot.Bot, update *mod
 		log.Error("failed to get recomendations", "error", err.Error())
 	}
 
-	recomendations = recomendations.RemoveByIDs(viewedIDs)
+	recomendations = recomendations.RemoveByIDs(viewedIDs).RemoveDuplicates()
 	sort.Slice(recomendations, func(i, j int) bool {
 		return recomendations[i].Popularity > recomendations[j].Popularity
 	})
+
+	if len(recomendations) == 0 {
+		t.bot.SendMessage(ctx, &bot.SendMessageParams{
+			ChatID: update.Message.Chat.ID,
+			Text:   "У вас нет рекомендаций",
+		})
+		return
+	}
 
 	opts := []slider.Option{
 		slider.WithPrefix("slider_tv_recomendations"),

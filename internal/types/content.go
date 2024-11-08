@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
+	"whattowatch/internal/utils"
 )
 
 type ContentItem struct {
@@ -43,13 +44,13 @@ func (c ContentItem) String() string {
 		"*ID:* /%s%d\n\n*Название:* %s\n\n*Жанры:* %s\n\n*Дата выхода:* %s\n\n*Популярность:* %s\n\n*Рейтинг:* %s\n\n*Количество оценок:* %d\n\n*Описание:* %s",
 		c.ContentType.Sign(),
 		c.ID,
-		c.Title,
+		utils.EscapeString(c.Title),
 		c.Genres.String(),
-		c.ReleaseDate.Time.Format("02.01.2006"),
-		fmt.Sprintf("%.2f", c.Popularity),
-		fmt.Sprintf("%.2f", c.VoteAverage),
+		utils.EscapeString(c.ReleaseDate.Time.Format("02.01.2006")),
+		utils.EscapeString(fmt.Sprintf("%.2f", c.Popularity)),
+		utils.EscapeString(fmt.Sprintf("%.2f", c.VoteAverage)),
 		c.VoteCount,
-		overview,
+		utils.EscapeString(overview),
 	)
 }
 
@@ -63,10 +64,10 @@ func (c ContentItem) ShortString() string {
 		"*ID:* /%s%d\n\n*Название:* %s\n\n*Дата выхода:* %s\n\n*Рейтинг:* %s\n\n*Описание:* %s",
 		c.ContentType.Sign(),
 		c.ID,
-		c.Title,
-		c.ReleaseDate.Time.Format("02.01.2006"),
-		fmt.Sprintf("%.2f", c.VoteAverage),
-		overview,
+		utils.EscapeString(c.Title),
+		utils.EscapeString(c.ReleaseDate.Time.Format("02.01.2006")),
+		utils.EscapeString(fmt.Sprintf("%.2f", c.VoteAverage)),
+		utils.EscapeString(overview),
 	)
 }
 
@@ -123,6 +124,19 @@ func (content Content) RemoveByIDs(ids []int64) Content {
 	for _, c := range content {
 		if _, ok := filterMap[c.ID]; !ok {
 			result = append(result, c)
+		}
+	}
+
+	return result
+}
+
+func (content Content) RemoveDuplicates() Content {
+	result := make(Content, 0, len(content))
+	ids := make(map[int64]struct{}, len(content))
+	for _, c := range content {
+		if _, ok := ids[c.ID]; !ok {
+			result = append(result, c)
+			ids[c.ID] = struct{}{}
 		}
 	}
 

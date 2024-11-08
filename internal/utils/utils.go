@@ -10,7 +10,7 @@ import (
 func EscapeString(s string) string {
 	m := map[string]string{
 		"_": "\\_",
-		// "*": "\\*",
+		"*": "\\*",
 		"[": "\\[",
 		"]": "\\]",
 		"(": "\\(",
@@ -27,6 +27,11 @@ func EscapeString(s string) string {
 		"}": "\\}",
 		".": "\\.",
 		"!": "\\!",
+		"«": "\\«",
+		"»": "\\»",
+		"„": "\\„",
+		"“": "\\“",
+		"–": "\\–",
 	}
 	for k, v := range m {
 		s = strings.ReplaceAll(s, k, v)
