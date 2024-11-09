@@ -417,7 +417,6 @@ func (a *TMDbApi) GetMovieRecommendations(ctx context.Context, ids []int64) (typ
 	for i := 0; i < workers; i++ {
 		go func(id int, jobCh <-chan int64, movieCh chan<- content) {
 			for job := range jobCh {
-				a.opts["page"] = "1"
 				res, err := a.client.GetMovieRecommendations(int(job), a.opts)
 				log.Info("request to TMDb", "worker_id", id, "movie_id", job)
 				if err != nil {
@@ -500,7 +499,6 @@ func (a *TMDbApi) GetTVRecommendations(ctx context.Context, ids []int64) (types.
 	for i := 0; i < workers; i++ {
 		go func(id int, jobCh <-chan int64, tvCh chan<- content) {
 			for job := range jobCh {
-				a.opts["page"] = "1"
 				res, err := a.client.GetTVRecommendations(int(job), a.opts)
 				log.Info("request to TMDb", "worker_id", id, "tv_id", job)
 				if err != nil {
@@ -609,7 +607,6 @@ func (a *TMDbApi) searchMovieByTitle(_ context.Context, titles []string) (types.
 	for i := 0; i < workers; i++ {
 		go func(id int, jobCh <-chan string, movieCh chan<- content) {
 			for job := range jobCh {
-				a.opts["page"] = "1"
 				res, err := a.client.GetSearchMovies(job, a.opts)
 				log.Info("request to TMDb", "worker_id", id, "title", job)
 				if err != nil {
@@ -686,7 +683,6 @@ func (a *TMDbApi) searchTVByTitle(_ context.Context, titles []string) (types.Con
 	for i := 0; i < workers; i++ {
 		go func(id int, jobCh <-chan string, movieCh chan<- content) {
 			for job := range jobCh {
-				a.opts["page"] = "1"
 				res, err := a.client.GetSearchTVShow(job, a.opts)
 				log.Info("request to TMDb", "worker_id", id, "title", job)
 				if err != nil {
