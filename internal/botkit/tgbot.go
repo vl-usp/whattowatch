@@ -7,7 +7,6 @@ import (
 	"os/signal"
 	"sync"
 	"whattowatch/internal/config"
-	"whattowatch/internal/storage"
 	"whattowatch/internal/types"
 
 	"github.com/go-telegram/bot"
@@ -48,15 +47,38 @@ type (
 
 		SearchByTitles(ctx context.Context, titles []string) (types.Content, error)
 	}
+
+	UserStorer interface {
+		InsertUser(ctx context.Context, user types.User) error
+	}
+
+	FavoriteStorer interface {
+		GetFavoriteContentIDs(ctx context.Context, userID int64, contentType types.ContentType) ([]int64, error)
+		AddContentItemToFavorite(ctx context.Context, userID int64, item types.ContentItem) error
+		RemoveContentItemFromFavorite(ctx context.Context, userID int64, item types.ContentItem) error
+	}
+
+	ViewedStorer interface {
+		GetViewedContentIDs(ctx context.Context, userID int64, contentType types.ContentType) ([]int64, error)
+		AddContentItemToViewed(ctx context.Context, userID int64, item types.ContentItem) error
+		RemoveContentItemFromViewed(ctx context.Context, userID int64, item types.ContentItem) error
+	}
+
+	Storer interface {
+		UserStorer
+
+		FavoriteStorer
+		ViewedStorer
+
+		GetContentStatus(ctx context.Context, userID int64, item types.ContentItem) (types.ContentStatus, error)
+	}
 )
 
-type Storer interface {
-}
-
 type TGBot struct {
-	storer  storage.Storer
-	bot     *bot.Bot
+	storer  Storer
 	content ContentProvider
+
+	bot *bot.Bot
 
 	log *slog.Logger
 	cfg *config.Config
@@ -65,7 +87,7 @@ type TGBot struct {
 	mu       sync.RWMutex
 }
 
-func NewTGBot(cfg *config.Config, log *slog.Logger, storer storage.Storer, contentProvider ContentProvider) (*TGBot, error) {
+func NewTGBot(cfg *config.Config, log *slog.Logger, storer Storer, contentProvider ContentProvider) (*TGBot, error) {
 
 	tgbot := &TGBot{
 		storer:  storer,

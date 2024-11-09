@@ -6,7 +6,7 @@ import (
 	"os/exec"
 	"whattowatch/internal/config"
 	"whattowatch/internal/loader"
-	"whattowatch/internal/storage"
+	"whattowatch/internal/storage/postgresql"
 	"whattowatch/pkg/logger"
 )
 
@@ -19,12 +19,12 @@ func main() {
 	log, file := logger.SetupLogger(cfg.Env, cfg.LogDir+"/loader")
 	defer file.Close()
 
-	storer, err := storage.New(cfg, log)
+	postgresDB, err := postgresql.New(cfg, log)
 	if err != nil {
 		log.Error("creating storage error", "error", err.Error())
 		panic("creating storage error: " + err.Error())
 	}
-	loader, err := loader.NewTMDbLoader(cfg, log, storer)
+	loader, err := loader.NewTMDbLoader(cfg, log, postgresDB)
 	if err != nil {
 		log.Error("creating loader error", "error", err.Error())
 		panic("creating loader error: " + err.Error())

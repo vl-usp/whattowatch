@@ -4,7 +4,7 @@ import (
 	"whattowatch/internal/api"
 	"whattowatch/internal/botkit"
 	"whattowatch/internal/config"
-	"whattowatch/internal/storage"
+	"whattowatch/internal/storage/postgresql"
 	"whattowatch/pkg/logger"
 )
 
@@ -14,7 +14,7 @@ func main() {
 	log, file := logger.SetupLogger(cfg.Env, cfg.LogDir+"/bot")
 	defer file.Close()
 
-	storer, err := storage.New(cfg, log)
+	postgresDB, err := postgresql.New(cfg, log)
 	if err != nil {
 		log.Error("storage create error", "error", err.Error())
 		panic("storage create error: " + err.Error())
@@ -26,7 +26,7 @@ func main() {
 		panic("API create error: " + err.Error())
 	}
 
-	bot, err := botkit.NewTGBot(cfg, log, storer, api)
+	bot, err := botkit.NewTGBot(cfg, log, postgresDB, api)
 	if err != nil {
 		log.Error("TGBot create error", "error", err.Error())
 		panic("TGBot create error: " + err.Error())
