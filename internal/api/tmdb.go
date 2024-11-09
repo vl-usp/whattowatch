@@ -14,21 +14,30 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-type TMDbApi struct {
-	client *tmdb.Client
-	opts   map[string]string
-	cache  *cache.Cache
+type (
+	TMDbApi struct {
+		client *tmdb.Client
+		cache  *cache.Cache
+		opts   map[string]string
 
-	cfg *config.Config
-	log *slog.Logger
-}
+		cfg *config.Config
+		log *slog.Logger
+	}
 
-type content struct {
-	content types.Content
-	err     error
-}
+	content struct {
+		content types.Content
+		err     error
+	}
 
-var recomendationDateFrom = "2012-01-01"
+	contentItem struct {
+		contentItem types.ContentItem
+		err         error
+	}
+)
+
+const recomendationDateFrom = "2012-01-01"
+const emptyImageUrl = "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRRT-fEjKFv3PMMg47-olkMSqEDqD42C7ZAsg&s"
+const workers = 5
 
 func New(cfg *config.Config, log *slog.Logger) (*TMDbApi, error) {
 	opts := make(map[string]string)
@@ -79,6 +88,9 @@ func (a *TMDbApi) initCache() error {
 	})
 
 	err := g.Wait()
+
+	a.log.Debug("genres loaded", "genres", a.cache.Genres)
+
 	return err
 }
 
@@ -97,10 +109,12 @@ func (a *TMDbApi) getGenresByIDs(ids []int64) types.Genres {
 }
 
 func (a *TMDbApi) GetMovie(ctx context.Context, id int) (types.ContentItem, error) {
+	log := a.log.With("method", "GetMovie", "id", id)
 	m, err := a.client.GetMovieDetails(id, a.opts)
 	if err != nil {
 		return types.ContentItem{}, err
 	}
+	log.Info("got movie details", "id", m.ID, "title", m.Title)
 
 	rd, err := utils.GetReleaseDate(m.ReleaseDate)
 	if err != nil {
@@ -126,69 +140,116 @@ func (a *TMDbApi) GetMovie(ctx context.Context, id int) (types.ContentItem, erro
 	}, nil
 }
 
-// TODO: make concurrent requests
 func (a *TMDbApi) GetMovies(ctx context.Context, ids []int64) (types.Content, error) {
+	log := a.log.With("method", "GetMovies")
 	content := make(types.Content, 0, len(ids))
 
+	jobCh := make(chan int64, len(ids))
+	movieCh := make(chan contentItem, len(ids))
+	defer close(movieCh)
+
+	log.Info("start working pool", "ids", ids)
+	for i := 0; i < workers; i++ {
+		go func(id int, jobCh <-chan int64, movieCh chan<- contentItem) {
+			for job := range jobCh {
+				m, err := a.GetMovie(ctx, int(job))
+				movieCh <- contentItem{
+					contentItem: m,
+					err:         err,
+				}
+			}
+
+		}(i, jobCh, movieCh)
+	}
+
+	for _, id := range ids {
+		jobCh <- id
+	}
+	defer close(jobCh)
+
 	for i := 0; i < len(ids); i++ {
-		id := int(ids[i])
-		m, err := a.GetMovie(ctx, id)
-		if err != nil {
-			return nil, err
+		m := <-movieCh
+		if m.err != nil {
+			return nil, m.err
 		}
-		content = append(content, m)
+		content = append(content, m.contentItem)
 	}
 
 	return content, nil
 }
 
 func (a *TMDbApi) GetTV(ctx context.Context, id int) (types.ContentItem, error) {
-	m, err := a.client.GetTVDetails(id, a.opts)
+	log := a.log.With("method", "GetTV", "id", id)
+	tv, err := a.client.GetTVDetails(id, a.opts)
+	if err != nil {
+		return types.ContentItem{}, err
+	}
+	log.Info("got tv details", "id", tv.ID, "title", tv.Name)
+
+	rd, err := utils.GetReleaseDate(tv.FirstAirDate)
 	if err != nil {
 		return types.ContentItem{}, err
 	}
 
-	rd, err := utils.GetReleaseDate(m.FirstAirDate)
-	if err != nil {
-		return types.ContentItem{}, err
-	}
-
-	genres := make(types.Genres, 0, len(m.Genres))
-	for _, genre := range m.Genres {
+	genres := make(types.Genres, 0, len(tv.Genres))
+	for _, genre := range tv.Genres {
 		genres = append(genres, types.Genre{ID: genre.ID, Name: genre.Name})
 	}
 
 	return types.ContentItem{
-		ID:          m.ID,
+		ID:          tv.ID,
 		ContentType: types.TV,
-		Title:       m.Name,
-		Overview:    m.Overview,
-		Popularity:  m.Popularity,
-		PosterPath:  a.cfg.Urls.TMDbImageUrl + m.PosterPath,
+		Title:       tv.Name,
+		Overview:    tv.Overview,
+		Popularity:  tv.Popularity,
+		PosterPath:  a.cfg.Urls.TMDbImageUrl + tv.PosterPath,
 		ReleaseDate: rd,
-		VoteAverage: m.VoteAverage,
-		VoteCount:   m.VoteCount,
+		VoteAverage: tv.VoteAverage,
+		VoteCount:   tv.VoteCount,
 		Genres:      genres,
 	}, nil
 }
 
-// TODO: make concurrent requests
 func (a *TMDbApi) GetTVs(ctx context.Context, ids []int64) (types.Content, error) {
+	log := a.log.With("method", "GetTVs")
 	content := make(types.Content, 0, len(ids))
 
+	jobCh := make(chan int64, len(ids))
+	tvCh := make(chan contentItem, len(ids))
+	defer close(tvCh)
+
+	log.Info("start working pool", "ids", ids)
+	for i := 0; i < workers; i++ {
+		go func(id int, jobCh <-chan int64, tvCh chan<- contentItem) {
+			for job := range jobCh {
+				m, err := a.GetTV(ctx, int(job))
+				tvCh <- contentItem{
+					contentItem: m,
+					err:         err,
+				}
+			}
+
+		}(i, jobCh, tvCh)
+	}
+
+	for _, id := range ids {
+		jobCh <- id
+	}
+	defer close(jobCh)
+
 	for i := 0; i < len(ids); i++ {
-		id := int(ids[i])
-		m, err := a.GetTV(ctx, id)
-		if err != nil {
-			return nil, err
+		m := <-tvCh
+		if m.err != nil {
+			return nil, m.err
 		}
-		content = append(content, m)
+		content = append(content, m.contentItem)
 	}
 
 	return content, nil
 }
 
 func (a *TMDbApi) GetMoviePopular(ctx context.Context, page int) (types.Content, error) {
+	log := a.log.With("fn", "GetMoviePopular", "page", page)
 	a.opts["page"] = fmt.Sprintf("%d", page)
 	defer delete(a.opts, "page")
 
@@ -196,6 +257,7 @@ func (a *TMDbApi) GetMoviePopular(ctx context.Context, page int) (types.Content,
 	if err != nil {
 		return nil, err
 	}
+	log.Info("got movie popular", "count", len(m.MoviePopularResults.Results))
 
 	res := make(types.Content, 0, len(m.MoviePopularResults.Results))
 	for _, v := range m.MoviePopularResults.Results {
@@ -226,6 +288,8 @@ func (a *TMDbApi) GetMoviePopular(ctx context.Context, page int) (types.Content,
 }
 
 func (a *TMDbApi) GetTVPopular(ctx context.Context, page int) (types.Content, error) {
+	log := a.log.With("fn", "GetTVPopular", "page", page)
+
 	a.opts["page"] = fmt.Sprintf("%d", page)
 	defer delete(a.opts, "page")
 
@@ -233,6 +297,7 @@ func (a *TMDbApi) GetTVPopular(ctx context.Context, page int) (types.Content, er
 	if err != nil {
 		return nil, err
 	}
+	log.Info("got tv popular", "count", len(m.Results))
 
 	res := make(types.Content, 0, len(m.Results))
 	for _, v := range m.Results {
@@ -263,6 +328,8 @@ func (a *TMDbApi) GetTVPopular(ctx context.Context, page int) (types.Content, er
 }
 
 func (a *TMDbApi) GetMovieTop(ctx context.Context, page int) (types.Content, error) {
+	log := a.log.With("fn", "GetMovieTop", "page", page)
+
 	a.opts["page"] = fmt.Sprintf("%d", page)
 	defer delete(a.opts, "page")
 
@@ -270,6 +337,7 @@ func (a *TMDbApi) GetMovieTop(ctx context.Context, page int) (types.Content, err
 	if err != nil {
 		return nil, err
 	}
+	log.Info("got movie top rated", "count", len(m.Results))
 
 	res := make(types.Content, 0, len(m.Results))
 	for _, v := range m.Results {
@@ -300,6 +368,8 @@ func (a *TMDbApi) GetMovieTop(ctx context.Context, page int) (types.Content, err
 }
 
 func (a *TMDbApi) GetTVTop(ctx context.Context, page int) (types.Content, error) {
+	log := a.log.With("fn", "GetTVTop", "page", page)
+
 	a.opts["page"] = fmt.Sprintf("%d", page)
 	defer delete(a.opts, "page")
 
@@ -307,6 +377,7 @@ func (a *TMDbApi) GetTVTop(ctx context.Context, page int) (types.Content, error)
 	if err != nil {
 		return nil, err
 	}
+	log.Info("got tv top rated", "count", len(m.Results))
 
 	res := make(types.Content, 0, len(m.Results))
 	for _, v := range m.Results {
@@ -336,114 +407,170 @@ func (a *TMDbApi) GetTVTop(ctx context.Context, page int) (types.Content, error)
 	return res, nil
 }
 
-// TODO: make concurrent requests
 func (a *TMDbApi) GetMovieRecommendations(ctx context.Context, ids []int64) (types.Content, error) {
 	log := a.log.With("method", "GetMovieRecomendations")
 
-	content := make(types.Content, 0, len(ids))
+	jobCh := make(chan int64, len(ids))
+	movieCh := make(chan content, len(ids))
+	defer close(movieCh)
 
-	for i := 0; i < len(ids); i++ {
-		id := int(ids[i])
-		a.opts["page"] = "1"
-		res, err := a.client.GetMovieRecommendations(id, a.opts)
-		log.Info("request to TMDb", "id", id)
-		if err != nil {
-			return nil, err
-		}
+	for i := 0; i < workers; i++ {
+		go func(id int, jobCh <-chan int64, movieCh chan<- content) {
+			for job := range jobCh {
+				a.opts["page"] = "1"
+				res, err := a.client.GetMovieRecommendations(int(job), a.opts)
+				log.Info("request to TMDb", "worker_id", id, "movie_id", job)
+				if err != nil {
+					log.Error("request error", "id", id, "error", err.Error())
+					movieCh <- content{
+						err: err,
+					}
+				}
 
-		for _, v := range res.Results {
-			if v.Overview == "" {
-				log.Warn("empty overview", "id", v.ID)
-				continue
+				c := make(types.Content, 0, len(res.Results))
+				for _, v := range res.Results {
+					if v.Overview == "" {
+						log.Warn("empty overview", "id", v.ID)
+						continue
+					}
+
+					rd, err := utils.GetReleaseDate(v.ReleaseDate)
+					if err != nil {
+						log.Error("get release date error", "id", v.ID, "error", err.Error())
+						continue
+					}
+
+					filterTime, err := time.Parse("2006-01-02", recomendationDateFrom)
+					if err != nil {
+						log.Error("parse filter date error", "error", err.Error())
+						continue
+					}
+
+					if rd.Time.Before(filterTime) {
+						continue
+					}
+
+					c = append(c, types.ContentItem{
+						ID:          v.ID,
+						ContentType: types.Movie,
+						Title:       v.Title,
+						Overview:    v.Overview,
+						Popularity:  v.Popularity,
+						PosterPath:  a.cfg.Urls.TMDbImageUrl + v.PosterPath,
+						ReleaseDate: rd,
+						VoteAverage: v.VoteAverage,
+						VoteCount:   v.VoteCount,
+						Genres:      a.getGenresByIDs(v.GenreIDs),
+					})
+				}
+
+				movieCh <- content{
+					content: c,
+					err:     err,
+				}
 			}
 
-			rd, err := utils.GetReleaseDate(v.ReleaseDate)
-			if err != nil {
-				log.Error("get release date error", "id", v.ID, "error", err.Error())
-				continue
-			}
-
-			filterTime, err := time.Parse("2006-01-02", recomendationDateFrom)
-			if err != nil {
-				log.Error("parse filter date error", "error", err.Error())
-				continue
-			}
-
-			if rd.Time.Before(filterTime) {
-				continue
-			}
-
-			content = append(content, types.ContentItem{
-				ID:          v.ID,
-				ContentType: types.Movie,
-				Title:       v.Title,
-				Overview:    v.Overview,
-				Popularity:  v.Popularity,
-				PosterPath:  a.cfg.Urls.TMDbImageUrl + v.PosterPath,
-				ReleaseDate: rd,
-				VoteAverage: v.VoteAverage,
-				VoteCount:   v.VoteCount,
-				Genres:      a.getGenresByIDs(v.GenreIDs),
-			})
-		}
+		}(i, jobCh, movieCh)
 	}
 
-	return content, nil
+	for _, id := range ids {
+		jobCh <- id
+	}
+	defer close(jobCh)
+
+	result := make(types.Content, 0)
+	for i := 0; i < len(ids); i++ {
+		m := <-movieCh
+		if m.err != nil {
+			return nil, m.err
+		}
+		result = append(result, m.content...)
+	}
+
+	return result, nil
 }
 
-// TODO: make concurrent requests
 func (a *TMDbApi) GetTVRecommendations(ctx context.Context, ids []int64) (types.Content, error) {
 	log := a.log.With("method", "GetTVRecomendations")
 
-	content := make(types.Content, 0, len(ids))
+	jobCh := make(chan int64, len(ids))
+	tvCh := make(chan content, len(ids))
+	defer close(tvCh)
 
-	for i := 0; i < len(ids); i++ {
-		id := int(ids[i])
-		a.opts["page"] = "1"
-		res, err := a.client.GetTVRecommendations(id, a.opts)
-		log.Info("request to TMDb", "id", id)
-		if err != nil {
-			return nil, err
-		}
+	for i := 0; i < workers; i++ {
+		go func(id int, jobCh <-chan int64, tvCh chan<- content) {
+			for job := range jobCh {
+				a.opts["page"] = "1"
+				res, err := a.client.GetTVRecommendations(int(job), a.opts)
+				log.Info("request to TMDb", "worker_id", id, "tv_id", job)
+				if err != nil {
+					log.Error("request error", "id", id, "error", err.Error())
+					tvCh <- content{
+						err: err,
+					}
+				}
 
-		for _, v := range res.Results {
-			if v.Overview == "" {
-				log.Warn("empty overview", "id", v.ID)
-				continue
+				c := make(types.Content, 0, len(res.Results))
+				for _, v := range res.Results {
+					if v.Overview == "" {
+						log.Warn("empty overview", "id", v.ID)
+						continue
+					}
+
+					rd, err := utils.GetReleaseDate(v.FirstAirDate)
+					if err != nil {
+						log.Error("get release date error", "id", v.ID, "error", err.Error())
+						continue
+					}
+
+					filterTime, err := time.Parse("2006-01-02", recomendationDateFrom)
+					if err != nil {
+						log.Error("parse filter date error", "error", err.Error())
+						continue
+					}
+
+					if rd.Time.Before(filterTime) {
+						continue
+					}
+
+					c = append(c, types.ContentItem{
+						ID:          v.ID,
+						ContentType: types.TV,
+						Title:       v.Name,
+						Overview:    v.Overview,
+						Popularity:  v.Popularity,
+						PosterPath:  a.cfg.Urls.TMDbImageUrl + v.PosterPath,
+						ReleaseDate: rd,
+						VoteAverage: v.VoteAverage,
+						VoteCount:   v.VoteCount,
+						Genres:      a.getGenresByIDs(v.GenreIDs),
+					})
+				}
+
+				tvCh <- content{
+					content: c,
+					err:     err,
+				}
 			}
 
-			rd, err := utils.GetReleaseDate(v.FirstAirDate)
-			if err != nil {
-				log.Error("get release date error", "id", v.ID, "error", err.Error())
-				continue
-			}
-
-			filterTime, err := time.Parse("2006-01-02", recomendationDateFrom)
-			if err != nil {
-				log.Error("parse filter date error", "error", err.Error())
-				continue
-			}
-
-			if rd.Time.Before(filterTime) {
-				continue
-			}
-
-			content = append(content, types.ContentItem{
-				ID:          v.ID,
-				ContentType: types.TV,
-				Title:       v.Name,
-				Overview:    v.Overview,
-				Popularity:  v.Popularity,
-				PosterPath:  a.cfg.Urls.TMDbImageUrl + v.PosterPath,
-				ReleaseDate: rd,
-				VoteAverage: v.VoteAverage,
-				VoteCount:   v.VoteCount,
-				Genres:      a.getGenresByIDs(v.GenreIDs),
-			})
-		}
+		}(i, jobCh, tvCh)
 	}
 
-	return content, nil
+	for _, id := range ids {
+		jobCh <- id
+	}
+	defer close(jobCh)
+
+	result := make(types.Content, 0)
+	for i := 0; i < len(ids); i++ {
+		m := <-tvCh
+		if m.err != nil {
+			return nil, m.err
+		}
+		result = append(result, m.content...)
+	}
+
+	return result, nil
 }
 
 func (a *TMDbApi) SearchByTitles(ctx context.Context, titles []string) (types.Content, error) {
@@ -472,97 +599,156 @@ func (a *TMDbApi) SearchByTitles(ctx context.Context, titles []string) (types.Co
 	return append(movies.content, tvs.content...), nil
 }
 
-// TODO: make concurrent requests
 func (a *TMDbApi) searchMovieByTitle(_ context.Context, titles []string) (types.Content, error) {
 	log := a.log.With("method", "SearchMovieByTitle")
 
-	content := make(types.Content, 0, len(titles))
-	for _, title := range titles {
-		res, err := a.client.GetSearchMovies(title, a.opts)
-		log.Info("request to TMDb", "title", title)
-		if err != nil {
-			log.Error("request error", "error", err.Error())
-			return nil, err
-		}
+	jobCh := make(chan string, len(titles))
+	movieCh := make(chan content, len(titles))
+	defer close(movieCh)
 
-		for _, v := range res.Results {
-			if v.Title != title {
-				continue
+	for i := 0; i < workers; i++ {
+		go func(id int, jobCh <-chan string, movieCh chan<- content) {
+			for job := range jobCh {
+				a.opts["page"] = "1"
+				res, err := a.client.GetSearchMovies(job, a.opts)
+				log.Info("request to TMDb", "worker_id", id, "title", job)
+				if err != nil {
+					log.Error("request error", "id", id, "error", err.Error())
+					movieCh <- content{
+						err: err,
+					}
+				}
+
+				c := make(types.Content, 0, len(res.Results))
+				for _, v := range res.Results {
+					if v.Title != job {
+						continue
+					}
+
+					rd, err := utils.GetReleaseDate(v.ReleaseDate)
+					if err != nil {
+						log.Warn("get release date error", "id", v.ID, "error", err.Error())
+						continue
+					}
+
+					poster := a.cfg.Urls.TMDbImageUrl + v.PosterPath
+					if v.PosterPath == "" {
+						log.Warn("empty poster path", "id", v.ID)
+						poster = emptyImageUrl
+					}
+
+					c = append(c, types.ContentItem{
+						ID:          v.ID,
+						ContentType: types.Movie,
+						Title:       v.Title,
+						Overview:    v.Overview,
+						Popularity:  v.Popularity,
+						PosterPath:  poster,
+						ReleaseDate: rd,
+						VoteAverage: v.VoteAverage,
+						VoteCount:   v.VoteCount,
+					})
+				}
+
+				movieCh <- content{
+					content: c,
+					err:     err,
+				}
 			}
 
-			rd, err := utils.GetReleaseDate(v.ReleaseDate)
-			if err != nil {
-				log.Warn("get release date error", "id", v.ID, "error", err.Error())
-				continue
-			}
-
-			poster := a.cfg.Urls.TMDbImageUrl + v.PosterPath
-			if v.PosterPath == "" {
-				log.Warn("empty poster path", "id", v.ID)
-				poster = "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRRT-fEjKFv3PMMg47-olkMSqEDqD42C7ZAsg&s"
-			}
-
-			content = append(content, types.ContentItem{
-				ID:          v.ID,
-				ContentType: types.Movie,
-				Title:       title,
-				Overview:    v.Overview,
-				Popularity:  v.Popularity,
-				PosterPath:  poster,
-				ReleaseDate: rd,
-				VoteAverage: v.VoteAverage,
-				VoteCount:   v.VoteCount,
-			})
-		}
-
+		}(i, jobCh, movieCh)
 	}
 
-	return content, nil
+	for _, title := range titles {
+		jobCh <- title
+	}
+	defer close(jobCh)
+
+	result := make(types.Content, 0)
+	for i := 0; i < len(titles); i++ {
+		m := <-movieCh
+		if m.err != nil {
+			return nil, m.err
+		}
+		result = append(result, m.content...)
+	}
+
+	return result, nil
 }
 
-// TODO: make concurrent requests
 func (a *TMDbApi) searchTVByTitle(_ context.Context, titles []string) (types.Content, error) {
 	log := a.log.With("method", "SearchTVByTitle")
 
-	content := make(types.Content, 0, len(titles))
-	for _, title := range titles {
-		res, err := a.client.GetSearchTVShow(title, a.opts)
-		log.Info("request to TMDb", "title", title)
-		if err != nil {
-			log.Error("request error", "error", err.Error())
-			return nil, err
-		}
+	jobCh := make(chan string, len(titles))
+	tvCh := make(chan content, len(titles))
+	defer close(tvCh)
 
-		for _, v := range res.Results {
-			if v.Name != title {
-				continue
+	for i := 0; i < workers; i++ {
+		go func(id int, jobCh <-chan string, movieCh chan<- content) {
+			for job := range jobCh {
+				a.opts["page"] = "1"
+				res, err := a.client.GetSearchTVShow(job, a.opts)
+				log.Info("request to TMDb", "worker_id", id, "title", job)
+				if err != nil {
+					log.Error("request error", "id", id, "error", err.Error())
+					movieCh <- content{
+						err: err,
+					}
+				}
+
+				c := make(types.Content, 0, len(res.Results))
+				for _, v := range res.Results {
+					if v.Name != job {
+						continue
+					}
+
+					rd, err := utils.GetReleaseDate(v.FirstAirDate)
+					if err != nil {
+						log.Warn("get release date error", "id", v.ID, "error", err.Error())
+						continue
+					}
+
+					poster := a.cfg.Urls.TMDbImageUrl + v.PosterPath
+					if v.PosterPath == "" {
+						log.Warn("empty poster path", "id", v.ID)
+						poster = emptyImageUrl
+					}
+
+					c = append(c, types.ContentItem{
+						ID:          v.ID,
+						ContentType: types.TV,
+						Title:       v.Name,
+						Overview:    v.Overview,
+						Popularity:  v.Popularity,
+						PosterPath:  poster,
+						ReleaseDate: rd,
+						VoteAverage: v.VoteAverage,
+						VoteCount:   v.VoteCount,
+					})
+				}
+
+				tvCh <- content{
+					content: c,
+					err:     err,
+				}
 			}
 
-			poster := a.cfg.Urls.TMDbImageUrl + v.PosterPath
-			if v.PosterPath == "" {
-				log.Warn("empty poster path", "id", v.ID)
-				poster = "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRRT-fEjKFv3PMMg47-olkMSqEDqD42C7ZAsg&s"
-			}
-
-			rd, err := utils.GetReleaseDate(v.FirstAirDate)
-			if err != nil {
-				log.Warn("get release date error", "id", v.ID, "error", err.Error())
-				continue
-			}
-
-			content = append(content, types.ContentItem{
-				ID:          v.ID,
-				ContentType: types.TV,
-				Title:       title,
-				Overview:    v.Overview,
-				Popularity:  v.Popularity,
-				PosterPath:  poster,
-				ReleaseDate: rd,
-				VoteAverage: v.VoteAverage,
-				VoteCount:   v.VoteCount,
-			})
-		}
+		}(i, jobCh, tvCh)
 	}
 
-	return content, nil
+	for _, title := range titles {
+		jobCh <- title
+	}
+	defer close(jobCh)
+
+	result := make(types.Content, 0)
+	for i := 0; i < len(titles); i++ {
+		m := <-tvCh
+		if m.err != nil {
+			return nil, m.err
+		}
+		result = append(result, m.content...)
+	}
+
+	return result, nil
 }

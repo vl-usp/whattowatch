@@ -1,7 +1,7 @@
 package config
 
 import (
-	"log"
+	"log/slog"
 	"os"
 
 	"github.com/joho/godotenv"
@@ -18,10 +18,10 @@ type Config struct {
 }
 
 // MustLoad load configuration.
-func MustLoad() *Config {
-	err := godotenv.Load()
+func MustLoad(filenames ...string) *Config {
+	err := godotenv.Load(filenames...)
 	if err != nil {
-		log.Fatal("Error loading .env file")
+		slog.Error("Error loading .env file")
 	}
 
 	cfg := &Config{
