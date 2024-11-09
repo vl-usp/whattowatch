@@ -72,7 +72,7 @@ func (t *TGBot) searchByTitleHandler(ctx context.Context, b *bot.Bot, update *mo
 		titles = append(titles, strings.TrimSpace(title))
 	}
 
-	res, err := t.api.SearchByTitles(ctx, titles)
+	res, err := t.content.SearchByTitles(ctx, titles)
 	if err != nil {
 		log.Error("failed to get movies", "error", err.Error())
 		t.sendErrorMessage(ctx, update.Message.Chat.ID)
@@ -110,9 +110,9 @@ func (t *TGBot) searchByIDHandler(ctx context.Context, b *bot.Bot, update *model
 
 	switch contentType {
 	case "/f":
-		contentItem, err = t.api.GetMovie(ctx, id)
+		contentItem, err = t.content.GetMovie(ctx, id)
 	case "/t":
-		contentItem, err = t.api.GetTV(ctx, id)
+		contentItem, err = t.content.GetTV(ctx, id)
 	}
 	if err != nil {
 		log.Error("failed to get content item", "error", err.Error())

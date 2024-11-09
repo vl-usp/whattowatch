@@ -12,6 +12,55 @@ import (
 	"github.com/go-telegram/ui/slider"
 )
 
+func (t *TGBot) getMainKeyboard() *reply.ReplyKeyboard {
+	rk := reply.New(
+		t.bot,
+		reply.WithPrefix("rk_main"),
+		reply.IsSelective(),
+	).
+		Button("Фильмы 🎥", t.bot, bot.MatchTypeExact, t.onMoviesKeyboard).
+		Row().
+		Button("Сериалы 📺", t.bot, bot.MatchTypeExact, t.onTVsKeyboard)
+
+	return rk
+}
+
+func (t *TGBot) getMoviesKeyboard() *reply.ReplyKeyboard {
+	rk := reply.New(
+		t.bot,
+		reply.WithPrefix("rk_movies"),
+		reply.IsSelective(),
+	).
+		Button("Рекомендации 🎥", t.bot, bot.MatchTypeExact, t.onMoviesRecomendations).
+		Button("Популярные 🎥", t.bot, bot.MatchTypeExact, t.onMoviesPopular).
+		Button("Лучшие 🎥", t.bot, bot.MatchTypeExact, t.onMoviesTop).
+		Row().
+		Button("Избранные 🎥", t.bot, bot.MatchTypeExact, t.onMoviesFavorites).
+		Button("Просмотренные 🎥", t.bot, bot.MatchTypeExact, t.onMoviesViewed).
+		Row().
+		Button("🔙 Назад", t.bot, bot.MatchTypePrefix, t.onMainKeyboard)
+
+	return rk
+}
+
+func (t *TGBot) getTVsKeyboard() *reply.ReplyKeyboard {
+	rk := reply.New(
+		t.bot,
+		reply.WithPrefix("rk_tvs"),
+		reply.IsSelective(),
+	).
+		Button("Рекомендации 📺", t.bot, bot.MatchTypeExact, t.onTVsRecomendations).
+		Button("Популярные 📺", t.bot, bot.MatchTypeExact, t.onTVsPopular).
+		Button("Лучшие 📺", t.bot, bot.MatchTypeExact, t.onTVsTop).
+		Row().
+		Button("Избранные 📺", t.bot, bot.MatchTypeExact, t.onTVsFavorites).
+		Button("Просмотренные 📺", t.bot, bot.MatchTypeExact, t.onTVsViewed).
+		Row().
+		Button("🔙 Назад", t.bot, bot.MatchTypePrefix, t.onMainKeyboard)
+
+	return rk
+}
+
 func (t *TGBot) sendErrorMessage(ctx context.Context, chatID int64) {
 	t.bot.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID: chatID,
@@ -68,14 +117,7 @@ func (t *TGBot) onMainKeyboard(ctx context.Context, b *bot.Bot, update *models.U
 	t.mu.RUnlock()
 
 	if ok {
-		entry.replyKeyboard = reply.New(
-			b,
-			reply.WithPrefix("rk_main"),
-			reply.IsSelective(),
-		).
-			Button("Фильмы 🎥", b, bot.MatchTypeExact, t.onMoviesKeyboard).
-			Row().
-			Button("Сериалы 📺", b, bot.MatchTypeExact, t.onTVsKeyboard)
+		entry.replyKeyboard = t.getMainKeyboard()
 
 		t.mu.Lock()
 		t.userData[update.Message.From.ID] = entry
@@ -98,19 +140,7 @@ func (t *TGBot) onMoviesKeyboard(ctx context.Context, b *bot.Bot, update *models
 	t.mu.RUnlock()
 
 	if ok {
-		entry.replyKeyboard = reply.New(
-			b,
-			reply.WithPrefix("rk_movies"),
-			reply.IsSelective(),
-		).
-			Button("Рекомендации 🎥", b, bot.MatchTypeExact, t.onMoviesRecomendations).
-			Button("Популярные 🎥", b, bot.MatchTypeExact, t.onMoviesPopular).
-			Button("Лучшие 🎥", b, bot.MatchTypeExact, t.onMoviesTop).
-			Row().
-			Button("Избранные 🎥", b, bot.MatchTypeExact, t.onMoviesFavorites).
-			Button("Просмотренные 🎥", b, bot.MatchTypeExact, t.onMoviesViewed).
-			Row().
-			Button("🔙 Назад", b, bot.MatchTypePrefix, t.onMainKeyboard)
+		entry.replyKeyboard = t.getMoviesKeyboard()
 
 		t.mu.Lock()
 		t.userData[update.Message.From.ID] = entry
@@ -133,19 +163,7 @@ func (t *TGBot) onTVsKeyboard(ctx context.Context, b *bot.Bot, update *models.Up
 	t.mu.RUnlock()
 
 	if ok {
-		entry.replyKeyboard = reply.New(
-			b,
-			reply.WithPrefix("rk_tvs"),
-			reply.IsSelective(),
-		).
-			Button("Рекомендации 📺", b, bot.MatchTypeExact, t.onTVsRecomendations).
-			Button("Популярные 📺", b, bot.MatchTypeExact, t.onTVsPopular).
-			Button("Лучшие 📺", b, bot.MatchTypeExact, t.onTVsTop).
-			Row().
-			Button("Избранные 📺", b, bot.MatchTypeExact, t.onTVsFavorites).
-			Button("Просмотренные 📺", b, bot.MatchTypeExact, t.onTVsViewed).
-			Row().
-			Button("🔙 Назад", b, bot.MatchTypePrefix, t.onMainKeyboard)
+		entry.replyKeyboard = t.getTVsKeyboard()
 
 		t.mu.Lock()
 		t.userData[update.Message.From.ID] = entry
@@ -182,7 +200,7 @@ func (t *TGBot) onMoviesPopular(ctx context.Context, b *bot.Bot, update *models.
 
 func (t *TGBot) getMoviePopular(ctx context.Context, chatID int64, userData UserData) {
 	log := t.log.With("fn", "getMoviePopular", "chat_id", chatID)
-	m, err := t.api.GetMoviesPopular(ctx, userData.popularMoviesPage)
+	m, err := t.content.GetMoviePopular(ctx, userData.popularMoviesPage)
 	if err != nil {
 		log.Error("get movie popular", "err", err.Error())
 		t.sendErrorMessage(ctx, chatID)
@@ -239,7 +257,7 @@ func (t *TGBot) onTVsPopular(ctx context.Context, b *bot.Bot, update *models.Upd
 
 func (t *TGBot) getTVsPopular(ctx context.Context, chatID int64, userData UserData) {
 	log := t.log.With("fn", "getTVsPopular", "chat_id", chatID)
-	m, err := t.api.GetTVPopular(ctx, userData.popularTVsPage)
+	m, err := t.content.GetTVPopular(ctx, userData.popularTVsPage)
 	if err != nil {
 		log.Error("get tv popular", "err", err.Error())
 		t.sendErrorMessage(ctx, chatID)
@@ -291,9 +309,10 @@ func (t *TGBot) onMoviesTop(ctx context.Context, b *bot.Bot, update *models.Upda
 		t.getMoviesTop(ctx, update.Message.Chat.ID, entry)
 	}
 }
+
 func (t *TGBot) getMoviesTop(ctx context.Context, chatID int64, userData UserData) {
 	log := t.log.With("fn", "getMoviesTop", "chat_id", chatID)
-	m, err := t.api.GetMovieTop(ctx, userData.topMoviePage)
+	m, err := t.content.GetMovieTop(ctx, userData.topMoviePage)
 	if err != nil {
 		log.Error("get movies top", "err", err.Error())
 		t.sendErrorMessage(ctx, chatID)
@@ -344,7 +363,7 @@ func (t *TGBot) onTVsTop(ctx context.Context, b *bot.Bot, update *models.Update)
 
 func (t *TGBot) getTVsTop(ctx context.Context, chatID int64, userData UserData) {
 	log := t.log.With("fn", "getTVsTop", "chat_id", chatID)
-	m, err := t.api.GetTVTop(ctx, userData.topTVsPage)
+	m, err := t.content.GetTVTop(ctx, userData.topTVsPage)
 	if err != nil {
 		log.Error("get movies top", "err", err.Error())
 		t.sendErrorMessage(ctx, chatID)
@@ -394,7 +413,7 @@ func (t *TGBot) onMoviesRecomendations(ctx context.Context, b *bot.Bot, update *
 		return
 	}
 
-	recomendations, err := t.api.GetMovieRecomendations(ctx, favoriteIDs)
+	recomendations, err := t.content.GetMovieRecommendations(ctx, favoriteIDs)
 	if err != nil {
 		log.Error("failed to get recomendations", "error", err.Error())
 		t.sendErrorMessage(ctx, update.Message.Chat.ID)
@@ -438,7 +457,7 @@ func (t *TGBot) onTVsRecomendations(ctx context.Context, b *bot.Bot, update *mod
 		return
 	}
 
-	recomendations, err := t.api.GetTVRecomendations(ctx, favoriteIDs)
+	recomendations, err := t.content.GetTVRecommendations(ctx, favoriteIDs)
 	if err != nil {
 		log.Error("failed to get recomendations", "error", err.Error())
 	}
@@ -480,7 +499,7 @@ func (t *TGBot) onMoviesFavorites(ctx context.Context, b *bot.Bot, update *model
 		return
 	}
 
-	m, err := t.api.GetMovies(ctx, ids)
+	m, err := t.content.GetMovies(ctx, ids)
 	if err != nil {
 		log.Error("failed to get movies", "error", err.Error())
 		t.sendErrorMessage(ctx, update.Message.Chat.ID)
@@ -510,7 +529,7 @@ func (t *TGBot) onTVsFavorites(ctx context.Context, b *bot.Bot, update *models.U
 		return
 	}
 
-	m, err := t.api.GetTVs(ctx, ids)
+	m, err := t.content.GetTVs(ctx, ids)
 	if err != nil {
 		log.Error("failed to get tvs", "error", err.Error())
 		t.sendErrorMessage(ctx, update.Message.Chat.ID)
@@ -541,7 +560,7 @@ func (t *TGBot) onMoviesViewed(ctx context.Context, b *bot.Bot, update *models.U
 		return
 	}
 
-	m, err := t.api.GetMovies(ctx, ids)
+	m, err := t.content.GetMovies(ctx, ids)
 	if err != nil {
 		log.Error("failed to get movies", "error", err.Error())
 		t.sendErrorMessage(ctx, update.Message.Chat.ID)
@@ -571,7 +590,7 @@ func (t *TGBot) onTVsViewed(ctx context.Context, b *bot.Bot, update *models.Upda
 		return
 	}
 
-	m, err := t.api.GetTVs(ctx, ids)
+	m, err := t.content.GetTVs(ctx, ids)
 	if err != nil {
 		log.Error("failed to get tvs", "error", err.Error())
 		t.sendErrorMessage(ctx, update.Message.Chat.ID)

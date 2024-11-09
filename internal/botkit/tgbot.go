@@ -6,9 +6,9 @@ import (
 	"os"
 	"os/signal"
 	"sync"
-	"whattowatch/internal/api"
 	"whattowatch/internal/config"
 	"whattowatch/internal/storage"
+	"whattowatch/internal/types"
 
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
@@ -25,10 +25,38 @@ type UserData struct {
 	topTVsPage     int
 }
 
+type (
+	MovieProvider interface {
+		GetMovie(ctx context.Context, id int) (types.ContentItem, error)
+		GetMovies(ctx context.Context, ids []int64) (types.Content, error)
+		GetMoviePopular(ctx context.Context, page int) (types.Content, error)
+		GetMovieTop(ctx context.Context, page int) (types.Content, error)
+		GetMovieRecommendations(ctx context.Context, ids []int64) (types.Content, error)
+	}
+
+	TVProvider interface {
+		GetTV(ctx context.Context, id int) (types.ContentItem, error)
+		GetTVs(ctx context.Context, ids []int64) (types.Content, error)
+		GetTVPopular(ctx context.Context, page int) (types.Content, error)
+		GetTVTop(ctx context.Context, page int) (types.Content, error)
+		GetTVRecommendations(ctx context.Context, ids []int64) (types.Content, error)
+	}
+
+	ContentProvider interface {
+		MovieProvider
+		TVProvider
+
+		SearchByTitles(ctx context.Context, titles []string) (types.Content, error)
+	}
+)
+
+type Storer interface {
+}
+
 type TGBot struct {
-	storer storage.Storer
-	bot    *bot.Bot
-	api    *api.TMDbApi
+	storer  storage.Storer
+	bot     *bot.Bot
+	content ContentProvider
 
 	log *slog.Logger
 	cfg *config.Config
@@ -37,15 +65,11 @@ type TGBot struct {
 	mu       sync.RWMutex
 }
 
-func NewTGBot(cfg *config.Config, log *slog.Logger, storer storage.Storer) (*TGBot, error) {
-	api, err := api.New(cfg, storer, log)
-	if err != nil {
-		return nil, err
-	}
+func NewTGBot(cfg *config.Config, log *slog.Logger, storer storage.Storer, contentProvider ContentProvider) (*TGBot, error) {
 
 	tgbot := &TGBot{
-		storer: storer,
-		api:    api,
+		storer:  storer,
+		content: contentProvider,
 
 		log: log.With("pkg", "botkit"),
 		cfg: cfg,
@@ -110,17 +134,8 @@ func (t *TGBot) userDataMiddleware(next bot.HandlerFunc) bot.HandlerFunc {
 		if !ok {
 			log.Debug("init user data", "userID", id)
 
-			rk := reply.New(
-				b,
-				reply.WithPrefix("rk_main"),
-				reply.IsSelective(),
-			).
-				Button("Фильмы", b, bot.MatchTypeExact, t.onMoviesKeyboard).
-				Row().
-				Button("Сериалы", b, bot.MatchTypeExact, t.onTVsKeyboard)
-
 			ud := UserData{
-				replyKeyboard: rk,
+				replyKeyboard: t.getMainKeyboard(),
 
 				popularMoviesPage: 1,
 				topMoviePage:      1,

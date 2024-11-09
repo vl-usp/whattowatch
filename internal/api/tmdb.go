@@ -7,7 +7,6 @@ import (
 	"time"
 	"whattowatch/internal/api/cache"
 	"whattowatch/internal/config"
-	"whattowatch/internal/storage"
 	"whattowatch/internal/types"
 	"whattowatch/internal/utils"
 
@@ -18,16 +17,20 @@ import (
 type TMDbApi struct {
 	client *tmdb.Client
 	opts   map[string]string
-	storer storage.Storer
 	cache  *cache.Cache
 
 	cfg *config.Config
 	log *slog.Logger
 }
 
+type content struct {
+	content types.Content
+	err     error
+}
+
 var recomendationDateFrom = "2012-01-01"
 
-func New(cfg *config.Config, storer storage.Storer, log *slog.Logger) (*TMDbApi, error) {
+func New(cfg *config.Config, log *slog.Logger) (*TMDbApi, error) {
 	opts := make(map[string]string)
 	opts["language"] = "ru-RU"
 
@@ -39,7 +42,6 @@ func New(cfg *config.Config, storer storage.Storer, log *slog.Logger) (*TMDbApi,
 	api := &TMDbApi{
 		client: c,
 		opts:   opts,
-		storer: storer,
 
 		cfg: cfg,
 		log: log.With("pkg", "api"),
@@ -124,27 +126,13 @@ func (a *TMDbApi) GetMovie(ctx context.Context, id int) (types.ContentItem, erro
 	}, nil
 }
 
+// TODO: make concurrent requests
 func (a *TMDbApi) GetMovies(ctx context.Context, ids []int64) (types.Content, error) {
 	content := make(types.Content, 0, len(ids))
 
 	for i := 0; i < len(ids); i++ {
 		id := int(ids[i])
 		m, err := a.GetMovie(ctx, id)
-		if err != nil {
-			return nil, err
-		}
-		content = append(content, m)
-	}
-
-	return content, nil
-}
-
-func (a *TMDbApi) GetTVs(ctx context.Context, ids []int64) (types.Content, error) {
-	content := make(types.Content, 0, len(ids))
-
-	for i := 0; i < len(ids); i++ {
-		id := int(ids[i])
-		m, err := a.GetTV(ctx, id)
 		if err != nil {
 			return nil, err
 		}
@@ -184,7 +172,23 @@ func (a *TMDbApi) GetTV(ctx context.Context, id int) (types.ContentItem, error) 
 	}, nil
 }
 
-func (a *TMDbApi) GetMoviesPopular(ctx context.Context, page int) (types.Content, error) {
+// TODO: make concurrent requests
+func (a *TMDbApi) GetTVs(ctx context.Context, ids []int64) (types.Content, error) {
+	content := make(types.Content, 0, len(ids))
+
+	for i := 0; i < len(ids); i++ {
+		id := int(ids[i])
+		m, err := a.GetTV(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		content = append(content, m)
+	}
+
+	return content, nil
+}
+
+func (a *TMDbApi) GetMoviePopular(ctx context.Context, page int) (types.Content, error) {
 	a.opts["page"] = fmt.Sprintf("%d", page)
 	defer delete(a.opts, "page")
 
@@ -332,7 +336,8 @@ func (a *TMDbApi) GetTVTop(ctx context.Context, page int) (types.Content, error)
 	return res, nil
 }
 
-func (a *TMDbApi) GetMovieRecomendations(ctx context.Context, ids []int64) (types.Content, error) {
+// TODO: make concurrent requests
+func (a *TMDbApi) GetMovieRecommendations(ctx context.Context, ids []int64) (types.Content, error) {
 	log := a.log.With("method", "GetMovieRecomendations")
 
 	content := make(types.Content, 0, len(ids))
@@ -386,7 +391,8 @@ func (a *TMDbApi) GetMovieRecomendations(ctx context.Context, ids []int64) (type
 	return content, nil
 }
 
-func (a *TMDbApi) GetTVRecomendations(ctx context.Context, ids []int64) (types.Content, error) {
+// TODO: make concurrent requests
+func (a *TMDbApi) GetTVRecommendations(ctx context.Context, ids []int64) (types.Content, error) {
 	log := a.log.With("method", "GetTVRecomendations")
 
 	content := make(types.Content, 0, len(ids))
@@ -440,7 +446,34 @@ func (a *TMDbApi) GetTVRecomendations(ctx context.Context, ids []int64) (types.C
 	return content, nil
 }
 
-func (a *TMDbApi) SearchMovieByTitle(ctx context.Context, titles []string) (types.Content, error) {
+func (a *TMDbApi) SearchByTitles(ctx context.Context, titles []string) (types.Content, error) {
+	moviesCh := make(chan content)
+	tvsCh := make(chan content)
+
+	go func(moviesCh chan content) {
+		movies, err := a.searchMovieByTitle(ctx, titles)
+		moviesCh <- content{content: movies, err: err}
+	}(moviesCh)
+
+	go func(tvsCh chan content) {
+		tvs, err := a.searchTVByTitle(ctx, titles)
+		tvsCh <- content{content: tvs, err: err}
+	}(tvsCh)
+
+	movies := <-moviesCh
+	if movies.err != nil {
+		return nil, movies.err
+	}
+	tvs := <-tvsCh
+	if tvs.err != nil {
+		return nil, tvs.err
+	}
+
+	return append(movies.content, tvs.content...), nil
+}
+
+// TODO: make concurrent requests
+func (a *TMDbApi) searchMovieByTitle(_ context.Context, titles []string) (types.Content, error) {
 	log := a.log.With("method", "SearchMovieByTitle")
 
 	content := make(types.Content, 0, len(titles))
@@ -487,7 +520,8 @@ func (a *TMDbApi) SearchMovieByTitle(ctx context.Context, titles []string) (type
 	return content, nil
 }
 
-func (a *TMDbApi) SearchTVByTitle(ctx context.Context, titles []string) (types.Content, error) {
+// TODO: make concurrent requests
+func (a *TMDbApi) searchTVByTitle(_ context.Context, titles []string) (types.Content, error) {
 	log := a.log.With("method", "SearchTVByTitle")
 
 	content := make(types.Content, 0, len(titles))
@@ -531,35 +565,4 @@ func (a *TMDbApi) SearchTVByTitle(ctx context.Context, titles []string) (types.C
 	}
 
 	return content, nil
-}
-
-type result struct {
-	content types.Content
-	err     error
-}
-
-func (a *TMDbApi) SearchByTitles(ctx context.Context, titles []string) (types.Content, error) {
-	moviesCh := make(chan result)
-	tvsCh := make(chan result)
-
-	go func(moviesCh chan result) {
-		movies, err := a.SearchMovieByTitle(ctx, titles)
-		moviesCh <- result{content: movies, err: err}
-	}(moviesCh)
-
-	go func(tvsCh chan result) {
-		tvs, err := a.SearchTVByTitle(ctx, titles)
-		tvsCh <- result{content: tvs, err: err}
-	}(tvsCh)
-
-	movies := <-moviesCh
-	if movies.err != nil {
-		return nil, movies.err
-	}
-	tvs := <-tvsCh
-	if tvs.err != nil {
-		return nil, tvs.err
-	}
-
-	return append(movies.content, tvs.content...), nil
 }
