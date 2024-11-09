@@ -26,7 +26,7 @@ func main() {
 		panic("API create error: " + err.Error())
 	}
 
-	bot, err := botkit.NewTGBot(cfg, log, postgresDB, api)
+	bot, err := botkit.New(cfg, log, postgresDB, api)
 	if err != nil {
 		log.Error("TGBot create error", "error", err.Error())
 		panic("TGBot create error: " + err.Error())

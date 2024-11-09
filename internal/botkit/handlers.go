@@ -14,6 +14,8 @@ import (
 	"github.com/go-telegram/ui/slider"
 )
 
+type modifyUserContentFunc func(ctx context.Context, userID int64, item types.ContentItem) error
+
 func (t *TGBot) registerHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
 	log := t.log.With("fn", "registerHandler", "user_id", update.Message.From.ID, "chat_id", update.Message.Chat.ID)
 	log.Debug("handler func start log")
@@ -106,8 +108,8 @@ func (t *TGBot) searchByIDHandler(ctx context.Context, b *bot.Bot, update *model
 		t.sendErrorMessage(ctx, update.Message.Chat.ID)
 		return
 	}
-	var contentItem types.ContentItem
 
+	var contentItem types.ContentItem
 	switch contentType {
 	case "/f":
 		contentItem, err = t.content.GetMovie(ctx, id)
@@ -127,19 +129,8 @@ func (t *TGBot) searchByIDHandler(ctx context.Context, b *bot.Bot, update *model
 		return
 	}
 
-	kb := inline.New(b).Row()
-	serializedItem := types.SerializeContentItemKey(contentItem)
-	if cs.IsFavorite {
-		kb = kb.Button("Удалить из избранных", []byte(serializedItem), t.onRemoveFavorite)
-	} else {
-		kb = kb.Button("Добавить в избранные", []byte(serializedItem), t.onAddFavorite)
-	}
-
-	if cs.IsViewed {
-		kb = kb.Button("Удалить из просмотренных", []byte(serializedItem), t.onRemoveViewed)
-	} else {
-		kb = kb.Button("Добавить в просмотренные", []byte(serializedItem), t.onAddViewed)
-	}
+	serializedItem := types.SerializeContentItem(contentItem)
+	kb := t.getInlineKeyboard(cs, serializedItem)
 
 	_, err = b.SendPhoto(ctx, &bot.SendPhotoParams{
 		ChatID:      update.Message.Chat.ID,
@@ -154,70 +145,63 @@ func (t *TGBot) searchByIDHandler(ctx context.Context, b *bot.Bot, update *model
 	}
 }
 
-func (t *TGBot) onAddFavorite(ctx context.Context, b *bot.Bot, mes models.MaybeInaccessibleMessage, data []byte) {
-	log := t.log.With("fn", "onAddFavorite", "user_id", mes.Message.From.ID, "chat_id", mes.Message.Chat.ID)
+func (t *TGBot) onContentActionEvent(fn modifyUserContentFunc) inline.OnSelect {
+	return func(ctx context.Context, b *bot.Bot, mes models.MaybeInaccessibleMessage, data []byte) {
+		chatID := mes.Message.Chat.ID
 
-	item, err := types.UnserializeContentItemKey(string(data))
-	if err != nil {
-		log.Error("failed to unserialize item", "error", err.Error())
-		t.sendErrorMessage(ctx, mes.Message.Chat.ID)
-		return
-	}
+		log := t.log.With("fn", "onContentActionEvent", "chat_id", chatID)
 
-	err = t.storer.AddContentItemToFavorite(ctx, mes.Message.Chat.ID, item)
-	if err != nil {
-		log.Error("failed to add favorite", "error", err.Error())
-		t.sendErrorMessage(ctx, mes.Message.Chat.ID)
-	}
-}
+		item, err := types.UnserializeContentItem(data)
+		if err != nil {
+			log.Error("failed to unserialize item", "error", err.Error())
+			t.sendErrorMessage(ctx, mes.Message.Chat.ID)
+			return
+		}
 
-func (t *TGBot) onRemoveFavorite(ctx context.Context, b *bot.Bot, mes models.MaybeInaccessibleMessage, data []byte) {
-	log := t.log.With("fn", "onRemoveFavorite", "user_id", mes.Message.From.ID, "chat_id", mes.Message.Chat.ID)
+		err = fn(ctx, chatID, item)
+		if err != nil {
+			log.Error("failed to modify content", "error", err.Error())
+			t.sendErrorMessage(ctx, mes.Message.Chat.ID)
+			return
+		}
 
-	item, err := types.UnserializeContentItemKey(string(data))
-	if err != nil {
-		log.Error("failed to unserialize item", "error", err.Error())
-		t.sendErrorMessage(ctx, mes.Message.Chat.ID)
-		return
-	}
+		cs, err := t.storer.GetContentStatus(ctx, chatID, item)
+		if err != nil {
+			log.Error("failed to get content status", "error", err.Error())
+			t.sendErrorMessage(ctx, mes.Message.Chat.ID)
+			return
+		}
 
-	err = t.storer.RemoveContentItemFromFavorite(ctx, mes.Message.Chat.ID, item)
-	if err != nil {
-		log.Error("failed to remove favorite", "error", err.Error())
-		t.sendErrorMessage(ctx, mes.Message.Chat.ID)
-	}
-}
+		kb := t.getInlineKeyboard(cs, data)
 
-func (t *TGBot) onAddViewed(ctx context.Context, b *bot.Bot, mes models.MaybeInaccessibleMessage, data []byte) {
-	log := t.log.With("fn", "onAddViewed", "user_id", mes.Message.From.ID, "chat_id", mes.Message.Chat.ID)
+		_, err = b.SendPhoto(ctx, &bot.SendPhotoParams{
+			ChatID:      mes.Message.Chat.ID,
+			Photo:       &models.InputFileString{Data: item.PosterPath},
+			Caption:     item.String(),
+			ParseMode:   "Markdown",
+			ReplyMarkup: kb,
+		})
+		if err != nil {
+			log.Error("failed to send message", "error", err.Error())
+			t.sendErrorMessage(ctx, mes.Message.Chat.ID)
+		}
 
-	item, err := types.UnserializeContentItemKey(string(data))
-	if err != nil {
-		log.Error("failed to unserialize item", "error", err.Error())
-		t.sendErrorMessage(ctx, mes.Message.Chat.ID)
-		return
-	}
-
-	err = t.storer.AddContentItemToViewed(ctx, mes.Message.Chat.ID, item)
-	if err != nil {
-		log.Error("failed to add viewed", "error", err.Error())
-		t.sendErrorMessage(ctx, mes.Message.Chat.ID)
 	}
 }
 
-func (t *TGBot) onRemoveViewed(ctx context.Context, b *bot.Bot, mes models.MaybeInaccessibleMessage, data []byte) {
-	log := t.log.With("fn", "onRemoveViewed", "user_id", mes.Message.From.ID, "chat_id", mes.Message.Chat.ID)
-
-	item, err := types.UnserializeContentItemKey(string(data))
-	if err != nil {
-		log.Error("failed to unserialize item", "error", err.Error())
-		t.sendErrorMessage(ctx, mes.Message.Chat.ID)
-		return
+func (t *TGBot) getInlineKeyboard(contentStatus types.ContentStatus, data []byte) *inline.Keyboard {
+	kb := inline.New(t.bot).Row()
+	if contentStatus.IsFavorite {
+		kb = kb.Button("Удалить из избранных", data, t.onContentActionEvent(t.storer.RemoveContentItemFromFavorite))
+	} else {
+		kb = kb.Button("Добавить в избранные", data, t.onContentActionEvent(t.storer.AddContentItemToFavorite))
 	}
 
-	err = t.storer.RemoveContentItemFromViewed(ctx, mes.Message.Chat.ID, item)
-	if err != nil {
-		log.Error("failed to remove viewed", "error", err.Error())
-		t.sendErrorMessage(ctx, mes.Message.Chat.ID)
+	if contentStatus.IsViewed {
+		kb = kb.Button("Удалить из просмотренных", data, t.onContentActionEvent(t.storer.RemoveContentItemFromViewed))
+	} else {
+		kb = kb.Button("Добавить в просмотренные", data, t.onContentActionEvent(t.storer.AddContentItemToViewed))
 	}
+
+	return kb
 }

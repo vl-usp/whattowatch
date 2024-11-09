@@ -1,7 +1,9 @@
 package types
 
 import (
+	"bytes"
 	"database/sql"
+	"encoding/gob"
 	"fmt"
 	"strings"
 	"whattowatch/internal/utils"
@@ -20,18 +22,28 @@ type ContentItem struct {
 	Genres      Genres
 }
 
-func SerializeContentItemKey(c ContentItem) string {
-	return fmt.Sprintf("%d_%d", c.ID, c.ContentType.ID())
+func SerializeContentItem(c ContentItem) []byte {
+	var b bytes.Buffer
+
+	enc := gob.NewEncoder(&b)
+	if err := enc.Encode(c); err != nil {
+		fmt.Println("Error encoding struct:", err)
+		return nil
+	}
+
+	return b.Bytes()
 }
 
-func UnserializeContentItemKey(str string) (ContentItem, error) {
-	var id int64
-	var ct int
-	_, err := fmt.Sscanf(str, "%d_%d", &id, &ct)
-	if err != nil {
+func UnserializeContentItem(data []byte) (ContentItem, error) {
+	b := bytes.NewBuffer(data)
+
+	var ci ContentItem
+	dec := gob.NewDecoder(b)
+	if err := dec.Decode(&ci); err != nil {
 		return ContentItem{}, err
 	}
-	return ContentItem{ID: id, ContentType: ContentType(ct)}, nil
+
+	return ci, nil
 }
 
 func (c ContentItem) String() string {

@@ -10,19 +10,7 @@ import (
 	"whattowatch/internal/types"
 
 	"github.com/go-telegram/bot"
-	"github.com/go-telegram/bot/models"
-	"github.com/go-telegram/ui/keyboard/reply"
 )
-
-type UserData struct {
-	replyKeyboard *reply.ReplyKeyboard
-
-	popularMoviesPage int
-	topMoviePage      int
-
-	popularTVsPage int
-	topTVsPage     int
-}
 
 type (
 	MovieProvider interface {
@@ -72,23 +60,22 @@ type (
 
 		GetContentStatus(ctx context.Context, userID int64, item types.ContentItem) (types.ContentStatus, error)
 	}
+
+	TGBot struct {
+		storer  Storer
+		content ContentProvider
+
+		bot *bot.Bot
+
+		log *slog.Logger
+		cfg *config.Config
+
+		userData map[int64]UserData
+		mu       sync.RWMutex
+	}
 )
 
-type TGBot struct {
-	storer  Storer
-	content ContentProvider
-
-	bot *bot.Bot
-
-	log *slog.Logger
-	cfg *config.Config
-
-	userData map[int64]UserData
-	mu       sync.RWMutex
-}
-
-func NewTGBot(cfg *config.Config, log *slog.Logger, storer Storer, contentProvider ContentProvider) (*TGBot, error) {
-
+func New(cfg *config.Config, log *slog.Logger, storer Storer, contentProvider ContentProvider) (*TGBot, error) {
 	tgbot := &TGBot{
 		storer:  storer,
 		content: contentProvider,
@@ -138,45 +125,9 @@ func (t *TGBot) useHandlers() {
 	t.bot.RegisterHandler(bot.HandlerTypeMessageText, "/t", bot.MatchTypePrefix, t.searchByIDHandler)
 }
 
-func (t *TGBot) userDataMiddleware(next bot.HandlerFunc) bot.HandlerFunc {
-	return func(ctx context.Context, b *bot.Bot, update *models.Update) {
-		log := t.log.With("fn", "userDataMiddleware")
-
-		var id int64
-		if update.CallbackQuery != nil {
-			id = update.CallbackQuery.From.ID
-		} else {
-			id = update.Message.From.ID
-		}
-
-		t.mu.RLock()
-		entry, ok := t.userData[id]
-		t.mu.RUnlock()
-
-		if !ok {
-			log.Debug("init user data", "userID", id)
-
-			ud := UserData{
-				replyKeyboard: t.getMainKeyboard(),
-
-				popularMoviesPage: 1,
-				topMoviePage:      1,
-
-				popularTVsPage: 1,
-				topTVsPage:     1,
-			}
-
-			t.mu.Lock()
-			t.userData[id] = ud
-			t.mu.Unlock()
-
-			b.SendMessage(ctx, &bot.SendMessageParams{
-				ChatID:      id,
-				Text:        "Выберите тип контента, который хотите посмотреть",
-				ReplyMarkup: entry.replyKeyboard,
-			})
-		}
-
-		next(ctx, b, update)
-	}
+func (t *TGBot) sendErrorMessage(ctx context.Context, chatID int64) {
+	t.bot.SendMessage(ctx, &bot.SendMessageParams{
+		ChatID: chatID,
+		Text:   "Произошла ошибка. Попробуйте ещё раз позднее...",
+	})
 }
