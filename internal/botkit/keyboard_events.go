@@ -50,7 +50,7 @@ func (t *TGBot) onContentEvent(fn getRatingDataFunc, page Page) bot.HandlerFunc 
 		userID := update.Message.From.ID
 		chatID := update.Message.Chat.ID
 
-		log := t.log.With("fn", "getData", "user_id", userID, "chat_id", chatID)
+		log := t.log.With("fn", "onContentEvent", "user_id", userID, "chat_id", chatID)
 		log.Debug("handler func start log")
 
 		t.mu.RLock()
@@ -76,7 +76,7 @@ func (t *TGBot) onContentPageEvent(fn getRatingDataFunc, page Page) slider.OnCan
 	return func(ctx context.Context, b *bot.Bot, message models.MaybeInaccessibleMessage) {
 		chatID := message.Message.Chat.ID
 
-		log := t.log.With("fn", "getDataPageEvent", "chat_id", chatID)
+		log := t.log.With("fn", "onContentPageEvent", "chat_id", chatID)
 		log.Debug("handler func start log")
 
 		t.mu.RLock()
@@ -103,7 +103,7 @@ func (t *TGBot) onUserContentEvent(emptyMessage string, userContentFn getUserCon
 		userID := update.Message.From.ID
 		chatID := update.Message.Chat.ID
 
-		log := t.log.With("fn", "onMoviesFavorites", "user_id", userID, "chat_id", chatID)
+		log := t.log.With("fn", "onUserContentEvent", "user_id", userID, "chat_id", chatID)
 		log.Debug("handler func start log")
 
 		userContentIDs, err := userContentFn(ctx, userID, types.Movie)
@@ -139,26 +139,26 @@ func (t *TGBot) onRecommendationsEvent(getContentFn getContentByIDsFunc, content
 		userID := update.Message.From.ID
 		chatID := update.Message.Chat.ID
 
-		log := t.log.With("fn", "onMoviesRecomendations", "user_id", userID, "chat_id", chatID)
+		log := t.log.With("fn", "onRecommendationsEvent", "user_id", userID, "chat_id", chatID)
 		log.Debug("handler func start log")
 
 		favoriteIDs, err := t.storer.GetFavoriteContentIDs(ctx, userID, contentType)
 		if err != nil {
-			log.Error("failed to get favorite movies", "error", err.Error())
+			log.Error("failed to get user favorites", "error", err.Error())
 			t.sendErrorMessage(ctx, chatID)
 			return
 		}
 
 		viewedIDs, err := t.storer.GetViewedContentIDs(ctx, userID, contentType)
 		if err != nil {
-			log.Error("failed to get viewed movies", "error", err.Error())
+			log.Error("failed to get user viewed", "error", err.Error())
 			t.sendErrorMessage(ctx, chatID)
 			return
 		}
 
 		recomendations, err := getContentFn(ctx, favoriteIDs)
 		if err != nil {
-			log.Error("failed to get movie recommendations", "error", err.Error())
+			log.Error("failed to get recommendations", "error", err.Error())
 			t.sendErrorMessage(ctx, chatID)
 			return
 		}

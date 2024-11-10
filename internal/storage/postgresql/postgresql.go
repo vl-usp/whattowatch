@@ -3,6 +3,7 @@ package postgresql
 import (
 	"context"
 	"log/slog"
+	"time"
 	"whattowatch/internal/config"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -19,7 +20,15 @@ func New(cfg *config.Config, logger *slog.Logger) (*PostgreSQL, error) {
 		return nil, err
 	}
 
-	conn, err := pgxpool.NewWithConfig(context.Background(), pgxConfig)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	conn, err := pgxpool.NewWithConfig(ctx, pgxConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	err = conn.Ping(ctx)
 	if err != nil {
 		return nil, err
 	}

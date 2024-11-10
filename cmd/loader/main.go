@@ -2,32 +2,37 @@ package main
 
 import (
 	"context"
-	"fmt"
-	"os/exec"
+	"log/slog"
+	"os"
 	"whattowatch/internal/config"
 	"whattowatch/internal/loader"
 	"whattowatch/internal/storage/postgresql"
+	"whattowatch/internal/utils"
 	"whattowatch/pkg/logger"
 )
 
 func main() {
-	printIP()
-	// printData()
-
-	cfg := config.MustLoad()
+	cfg, err := config.MustLoad()
+	if err != nil {
+		ir, _ := os.Getwd()
+		slog.Error("failed to load config", "error", err.Error(), "current dir", ir)
+		panic("failed to load config: " + err.Error())
+	}
 
 	log, file := logger.SetupLogger(cfg.Env, cfg.LogDir+"/loader")
 	defer file.Close()
 
+	log.Info("Current IP: " + utils.GetMyIP())
+
 	postgresDB, err := postgresql.New(cfg, log)
 	if err != nil {
-		log.Error("creating storage error", "error", err.Error())
-		panic("creating storage error: " + err.Error())
+		log.Error("storage create error", "error", err.Error())
+		panic("storage create error: " + err.Error())
 	}
 	loader, err := loader.NewTMDbLoader(cfg, log, postgresDB)
 	if err != nil {
-		log.Error("creating loader error", "error", err.Error())
-		panic("creating loader error: " + err.Error())
+		log.Error("loader create error", "error", err.Error())
+		panic("loader create error: " + err.Error())
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -36,22 +41,4 @@ func main() {
 	if err != nil {
 		log.Error("load error", "error", err.Error())
 	}
-}
-
-func printIP() {
-	app := "wget"
-
-	arg0 := "-qO-"
-	arg1 := "eth0.me"
-
-	cmd := exec.Command(app, arg0, arg1)
-	stdout, err := cmd.Output()
-
-	if err != nil {
-		fmt.Println(err.Error())
-		return
-	}
-
-	// Print the output
-	fmt.Println("current IP is " + string(stdout))
 }

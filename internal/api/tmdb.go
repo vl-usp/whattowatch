@@ -47,6 +47,8 @@ func New(cfg *config.Config, log *slog.Logger) (*TMDbApi, error) {
 	if err != nil {
 		return nil, err
 	}
+	c.SetClientAutoRetry()
+	c.SetAlternateBaseURL()
 
 	api := &TMDbApi{
 		client: c,
@@ -56,8 +58,29 @@ func New(cfg *config.Config, log *slog.Logger) (*TMDbApi, error) {
 		log: log.With("pkg", "api"),
 	}
 
+	err = api.testConnection()
+	if err != nil {
+		return nil, err
+	}
+
 	api.initCache()
 	return api, nil
+}
+
+func (a *TMDbApi) testConnection() error {
+	err := utils.PingHost("google.com", 443)
+	if err != nil {
+		return fmt.Errorf("ping google.com error: %s", err.Error())
+	}
+	a.log.Info("ping google.com", "status", "success")
+
+	err = utils.PingHost("api.themoviedb.org", 443)
+	if err != nil {
+		return fmt.Errorf("ping api.themoviedb.org error: %s", err.Error())
+	}
+	a.log.Info("ping tmdb", "status", "success")
+
+	return nil
 }
 
 func (a *TMDbApi) initCache() error {

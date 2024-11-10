@@ -1,0 +1,54 @@
+networks:
+  bot-network:
+    driver: bridge
+
+services:
+  pg:
+    image: postgres:16-alpine
+    container_name: whattowatch-db
+    volumes:
+      - ./.db:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: "${DB_USERNAME}"
+      POSTGRES_PASSWORD: "${DB_PASSWORD}"
+      POSTGRES_DB: "${DB_DATABASE}"
+    ports:
+      - 5432:5432
+    networks:
+      - bot-network
+
+  migrator:
+    build:
+      context: .
+      dockerfile: migration.Dockerfile
+    container_name: whattowatch-migrator
+    restart: on-failure
+    environment:
+      DB_HOST: pg
+    depends_on:
+      - pg
+    networks:
+      - bot-network
+
+  loader:
+    build:
+      context: .
+      dockerfile: loader.Dockerfile
+    container_name: whattowatch-loader
+    # restart: always
+    depends_on:
+      - pg
+      - migrator
+    networks:
+      - bot-network
+
+  bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: whattowatch-bot
+    # restart: always
+    depends_on:
+      - pg
+    networks:
+      - bot-network

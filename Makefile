@@ -36,6 +36,6 @@ migration-down-all:
 migration-reset: migration-down-all migration-up
 
 docker-up:
-	mkdir -p .tmp
+	mkdir -p .tmp/build
 	docker compose build --progress plain &> .tmp/build/docker.log
-	docker compose up -d
+	docker compose up -d --build

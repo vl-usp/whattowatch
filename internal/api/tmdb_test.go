@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"testing"
 	"whattowatch/internal/config"
@@ -10,7 +11,12 @@ import (
 )
 
 func getConfig() *config.Config {
-	return config.MustLoad("../../.env")
+	cfg, err := config.MustLoad("../../.env")
+	if err != nil {
+		fmt.Println("failed to load config: " + err.Error())
+		return nil
+	}
+	return cfg
 }
 
 func Test_GetMovie(t *testing.T) {

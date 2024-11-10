@@ -3,6 +3,9 @@ package utils
 import (
 	"database/sql"
 	"fmt"
+	"net"
+	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -91,4 +94,25 @@ func Filter[T any](ss []T, test func(T) bool) (ret []T) {
 		}
 	}
 	return
+}
+
+func GetMyIP() string {
+	cmd := exec.Command("wget", "-qO-", "eth0.me")
+	stdout, err := cmd.Output()
+
+	if err != nil {
+		return err.Error()
+	}
+
+	return string(stdout)
+}
+
+func PingHost(host string, port int) error {
+	timeout := time.Duration(1 * time.Second)
+	conn, err := net.DialTimeout("tcp", host+":"+strconv.Itoa(port), timeout)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	return nil
 }

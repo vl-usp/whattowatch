@@ -97,7 +97,7 @@ func (t *TGBot) searchByTitleHandler(ctx context.Context, b *bot.Bot, update *mo
 }
 
 func (t *TGBot) searchByIDHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
-	log := t.log.With("fn", "searchHandler", "user_id", update.Message.From.ID, "chat_id", update.Message.Chat.ID)
+	log := t.log.With("fn", "searchByIDHandler", "user_id", update.Message.From.ID, "chat_id", update.Message.Chat.ID)
 	log.Debug("handler func start log")
 
 	contentType := update.Message.Text[:2]

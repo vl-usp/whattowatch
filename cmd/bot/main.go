@@ -1,18 +1,28 @@
 package main
 
 import (
+	"log/slog"
+	"os"
 	"whattowatch/internal/api"
 	"whattowatch/internal/botkit"
 	"whattowatch/internal/config"
 	"whattowatch/internal/storage/postgresql"
+	"whattowatch/internal/utils"
 	"whattowatch/pkg/logger"
 )
 
 func main() {
-	cfg := config.MustLoad()
+	cfg, err := config.MustLoad()
+	if err != nil {
+		ir, _ := os.Getwd()
+		slog.Error("failed to load config", "error", err.Error(), "current dir", ir)
+		panic("failed to load config: " + err.Error())
+	}
 
 	log, file := logger.SetupLogger(cfg.Env, cfg.LogDir+"/bot")
 	defer file.Close()
+
+	log.Info("Current IP: " + utils.GetMyIP())
 
 	postgresDB, err := postgresql.New(cfg, log)
 	if err != nil {
