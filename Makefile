@@ -1,7 +1,6 @@
 include .env.default
 LOCAL_BIN=$(CURDIR)/bin
 NAME=default
-MIGRATION_DIR=$(CURDIR)/migration
 
 .PHONY: build install-deps bot load migration-create migration-status migration-up migration-down docker-up 
 
