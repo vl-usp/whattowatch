@@ -32,7 +32,9 @@ services:
     build:
       context: .
       dockerfile: loader.Dockerfile
-    container_name: whattowatch-loader
+    container_name: whattowatch-loade
+    volumes:
+      - ./.tmp:./.tmp
     restart: always
     depends_on:
       - pg
@@ -45,6 +47,8 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: whattowatch-bot
+    volumes:
+      - ./.tmp:./.tmp
     restart: always
     depends_on:
       - pg
