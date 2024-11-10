@@ -46,7 +46,7 @@ func UnserializeContentItem(data []byte) (ContentItem, error) {
 	return ci, nil
 }
 
-func (c ContentItem) String() string {
+func (c ContentItem) GetInfo() string {
 	overview := c.Overview
 	if overview == "" {
 		overview = "Описание отсутствует"
@@ -69,7 +69,7 @@ func (c ContentItem) String() string {
 	)
 }
 
-func (c ContentItem) ShortString() string {
+func (c ContentItem) GetShortInfo() string {
 	overview := c.Overview
 	if overview == "" {
 		overview = "Описание отсутствует"
@@ -91,7 +91,7 @@ func (c ContentItem) ShortString() string {
 
 type Content []ContentItem
 
-func (content Content) Print(title string) string {
+func (content Content) GetInfo(title string) string {
 	builder := strings.Builder{}
 	builder.WriteString(fmt.Sprintf("%s\n", title))
 	for _, c := range content {

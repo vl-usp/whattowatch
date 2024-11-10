@@ -1,11 +1,20 @@
 package cache
 
 type Cache struct {
-	Genres *Genres
+	Genres struct {
+		TV    *Genres
+		Movie *Genres
+	}
 }
 
 func New() *Cache {
 	return &Cache{
-		Genres: NewGenres(),
+		Genres: struct {
+			TV    *Genres
+			Movie *Genres
+		}{
+			TV:    NewGenres(),
+			Movie: NewGenres(),
+		},
 	}
 }

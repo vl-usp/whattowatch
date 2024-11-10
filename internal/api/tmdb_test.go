@@ -318,7 +318,43 @@ func Test_cache(t *testing.T) {
 	assert.NotNil(t, a.cache)
 
 	for k, v := range genresMap {
-		genre, _ := a.cache.Genres.Get(k)
+		genre, _ := a.cache.Genres.Movie.Get(k)
 		assert.Equal(t, v, genre)
+	}
+}
+
+func Test_GetMoviesByGenre(t *testing.T) {
+	a, err := New(getConfig(), slog.Default())
+	assert.NoError(t, err)
+
+	ctx := context.Background()
+
+	genreIDs := []int{28, 53}
+
+	res, err := a.GetMoviesByGenre(ctx, genreIDs, 1)
+	assert.NoError(t, err)
+	assert.NotNil(t, res)
+	assert.Greater(t, len(res), 0)
+
+	for _, r := range res {
+		assert.Contains(t, genreIDs, r.Genres[0].ID)
+	}
+}
+
+func Test_GetTVsByGenre(t *testing.T) {
+	a, err := New(getConfig(), slog.Default())
+	assert.NoError(t, err)
+
+	ctx := context.Background()
+
+	genreIDs := []int{10759, 10765}
+
+	res, err := a.GetTVsByGenre(ctx, genreIDs, 1)
+	assert.NoError(t, err)
+	assert.NotNil(t, res)
+	assert.Greater(t, len(res), 0)
+
+	for _, r := range res {
+		assert.Contains(t, genreIDs, r.Genres[0].ID)
 	}
 }

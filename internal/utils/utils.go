@@ -116,3 +116,11 @@ func PingHost(host string, port int) error {
 	defer conn.Close()
 	return nil
 }
+
+func IntSliceToStringSlice(i []int) []string {
+	s := make([]string, 0, len(i))
+	for _, v := range i {
+		s = append(s, strconv.Itoa(v))
+	}
+	return s
+}

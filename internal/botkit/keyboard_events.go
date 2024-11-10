@@ -11,9 +11,23 @@ import (
 	"github.com/go-telegram/ui/slider"
 )
 
-type getRatingDataFunc func(ctx context.Context, chatID int64, userData UserData)
+type showContentDataFunc func(ctx context.Context, chatID int64, userData UserData)
 type getUserContentIDsFunc func(ctx context.Context, userID int64, contentType types.ContentType) ([]int64, error)
 type getContentByIDsFunc func(ctx context.Context, ids []int64) (types.Content, error)
+
+func (t *TGBot) handlerReplyKeyboard(ctx context.Context, b *bot.Bot, update *models.Update) {
+	t.mu.RLock()
+	entry, ok := t.userData[update.Message.From.ID]
+	t.mu.RUnlock()
+
+	if ok {
+		b.SendMessage(ctx, &bot.SendMessageParams{
+			ChatID:      update.Message.Chat.ID,
+			Text:        "Выберите тип контента, который хотите посмотреть",
+			ReplyMarkup: entry.replyKeyboard,
+		})
+	}
+}
 
 func (t *TGBot) onKeyboardChangeEvent(msg string, keyboardFn keyboardFunc) bot.HandlerFunc {
 	return func(ctx context.Context, b *bot.Bot, update *models.Update) {
@@ -45,7 +59,7 @@ func (t *TGBot) onKeyboardChangeEvent(msg string, keyboardFn keyboardFunc) bot.H
 	}
 }
 
-func (t *TGBot) onContentEvent(fn getRatingDataFunc, page Page) bot.HandlerFunc {
+func (t *TGBot) onContentEvent(fn showContentDataFunc, page Page) bot.HandlerFunc {
 	return func(ctx context.Context, b *bot.Bot, update *models.Update) {
 		userID := update.Message.From.ID
 		chatID := update.Message.Chat.ID
@@ -72,7 +86,7 @@ func (t *TGBot) onContentEvent(fn getRatingDataFunc, page Page) bot.HandlerFunc 
 	}
 }
 
-func (t *TGBot) onContentPageEvent(fn getRatingDataFunc, page Page) slider.OnCancelFunc {
+func (t *TGBot) onContentPageEvent(fn showContentDataFunc, page Page) slider.OnCancelFunc {
 	return func(ctx context.Context, b *bot.Bot, message models.MaybeInaccessibleMessage) {
 		chatID := message.Message.Chat.ID
 
@@ -180,14 +194,14 @@ func (t *TGBot) onRecommendationsEvent(getContentFn getContentByIDsFunc, content
 	}
 }
 
-// getMoviePopular retrieves the popular movies content from the content service and shows it
+// showMoviePopular retrieves the popular movies content from the content service and shows it
 // to the user.
-func (t *TGBot) getMoviePopular(ctx context.Context, chatID int64, userData UserData) {
-	log := t.log.With("fn", "getMoviePopular", "chat_id", chatID)
-	log.Debug("starting getMoviePopular function")
+func (t *TGBot) showMoviePopular(ctx context.Context, chatID int64, userData UserData) {
+	log := t.log.With("fn", "showMoviePopular", "chat_id", chatID)
+	log.Debug("handler func start log")
 
 	page := userData.pagesMap[MoviePopular]
-	m, err := t.content.GetMoviePopular(ctx, page)
+	m, err := t.api.GetMoviePopular(ctx, page)
 	if err != nil {
 		log.Error("failed to get popular movies", "error", err.Error())
 		t.sendErrorMessage(ctx, chatID)
@@ -195,20 +209,20 @@ func (t *TGBot) getMoviePopular(ctx context.Context, chatID int64, userData User
 	}
 
 	opts := []slider.Option{
-		slider.OnCancel("Показать еще", true, t.onContentPageEvent(t.getMoviePopular, MoviePopular)),
+		slider.OnCancel("Показать еще", true, t.onContentPageEvent(t.showMoviePopular, MoviePopular)),
 	}
 	slides := t.generateSlider(m, opts)
 	slides.Show(ctx, t.bot, chatID)
 }
 
-// getMoviesTop retrieves the top-rated movies content from the content service and displays it to the user.
-func (t *TGBot) getMovieTop(ctx context.Context, chatID int64, userData UserData) {
+// showMovieTop retrieves the top-rated movies content from the content service and displays it to the user.
+func (t *TGBot) showMovieTop(ctx context.Context, chatID int64, userData UserData) {
 	page := userData.pagesMap[MovieTop]
 
-	log := t.log.With("fn", "getMoviesTop", "chat_id", chatID, "page", page)
+	log := t.log.With("fn", "showMovieTop", "chat_id", chatID, "page", page)
 	log.Debug("handler func start log")
 
-	content, err := t.content.GetMovieTop(ctx, page)
+	content, err := t.api.GetMovieTop(ctx, page)
 	if err != nil {
 		log.Error("failed to get movie top", "error", err.Error())
 		t.sendErrorMessage(ctx, chatID)
@@ -216,21 +230,21 @@ func (t *TGBot) getMovieTop(ctx context.Context, chatID int64, userData UserData
 	}
 
 	opts := []slider.Option{
-		slider.OnCancel("Показать еще", true, t.onContentPageEvent(t.getMovieTop, MovieTop)),
+		slider.OnCancel("Показать еще", true, t.onContentPageEvent(t.showMovieTop, MovieTop)),
 	}
 
 	slides := t.generateSlider(content, opts)
 	slides.Show(ctx, t.bot, chatID)
 }
 
-// getTVsPopular gets popular TV shows and shows them to the user
-func (t *TGBot) getTVPopular(ctx context.Context, chatID int64, userData UserData) {
+// showTVPopular gets popular TV shows and shows them to the user
+func (t *TGBot) showTVPopular(ctx context.Context, chatID int64, userData UserData) {
 	page := userData.pagesMap[TVPopular]
 
-	log := t.log.With("fn", "getTVsPopular", "chat_id", chatID, "page", page)
+	log := t.log.With("fn", "showTVPopular", "chat_id", chatID, "page", page)
 	log.Debug("handler func start log")
 
-	content, err := t.content.GetTVPopular(ctx, page)
+	content, err := t.api.GetTVPopular(ctx, page)
 	if err != nil {
 		log.Error("failed to get popular tvs", "error", err.Error())
 		t.sendErrorMessage(ctx, chatID)
@@ -238,21 +252,21 @@ func (t *TGBot) getTVPopular(ctx context.Context, chatID int64, userData UserDat
 	}
 
 	opts := []slider.Option{
-		slider.OnCancel("Показать еще", true, t.onContentPageEvent(t.getTVPopular, TVPopular)),
+		slider.OnCancel("Показать еще", true, t.onContentPageEvent(t.showTVPopular, TVPopular)),
 	}
 	slides := t.generateSlider(content, opts)
 	slides.Show(ctx, t.bot, chatID)
 }
 
-// getTVsTop retrieves the top TV shows content from the content service and shows it
+// showTVTop retrieves the top TV shows content from the content service and shows it
 // to the user.
-func (t *TGBot) getTVTop(ctx context.Context, chatID int64, userData UserData) {
+func (t *TGBot) showTVTop(ctx context.Context, chatID int64, userData UserData) {
 	page := userData.pagesMap[TVTop]
 
-	log := t.log.With("fn", "getTVsTop", "chat_id", chatID, "page", page)
-	log.Debug("starting getTVsTop function")
+	log := t.log.With("fn", "showTVTop", "chat_id", chatID, "page", page)
+	log.Debug("handler func start log")
 
-	content, err := t.content.GetTVTop(ctx, page)
+	content, err := t.api.GetTVTop(ctx, page)
 	if err != nil {
 		log.Error("failed to get top tvs", "error", err.Error())
 		t.sendErrorMessage(ctx, chatID)
@@ -260,8 +274,31 @@ func (t *TGBot) getTVTop(ctx context.Context, chatID int64, userData UserData) {
 	}
 
 	opts := []slider.Option{
-		slider.OnCancel("Показать еще", true, t.onContentPageEvent(t.getTVTop, TVTop)),
+		slider.OnCancel("Показать еще", true, t.onContentPageEvent(t.showTVTop, TVTop)),
 	}
 	slides := t.generateSlider(content, opts)
 	slides.Show(ctx, t.bot, chatID)
+}
+
+func (t *TGBot) onGetGenresEvent(contentType types.ContentType) bot.HandlerFunc {
+	return func(ctx context.Context, b *bot.Bot, update *models.Update) {
+		userID := update.Message.From.ID
+		chatID := update.Message.Chat.ID
+
+		log := t.log.With("fn", "onGetGenresEvent", "user_id", userID, "chat_id", chatID)
+		log.Debug("handler func start log")
+
+		genres, err := t.api.GetGenres(ctx, contentType)
+		if err != nil {
+			log.Error("failed to get genres", "error", err.Error())
+			t.sendErrorMessage(ctx, chatID)
+			return
+		}
+
+		t.bot.SendMessage(ctx, &bot.SendMessageParams{
+			ChatID:    chatID,
+			Text:      genres.GetInfo(contentType),
+			ParseMode: "Markdown",
+		})
+	}
 }

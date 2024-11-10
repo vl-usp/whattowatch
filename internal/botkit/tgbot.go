@@ -10,6 +10,7 @@ import (
 	"whattowatch/internal/types"
 
 	"github.com/go-telegram/bot"
+	"github.com/go-telegram/ui/slider"
 )
 
 type (
@@ -19,6 +20,7 @@ type (
 		GetMoviePopular(ctx context.Context, page int) (types.Content, error)
 		GetMovieTop(ctx context.Context, page int) (types.Content, error)
 		GetMovieRecommendations(ctx context.Context, ids []int64) (types.Content, error)
+		GetMoviesByGenre(ctx context.Context, genreIDs []int, page int) (types.Content, error)
 	}
 
 	TVProvider interface {
@@ -27,11 +29,17 @@ type (
 		GetTVPopular(ctx context.Context, page int) (types.Content, error)
 		GetTVTop(ctx context.Context, page int) (types.Content, error)
 		GetTVRecommendations(ctx context.Context, ids []int64) (types.Content, error)
+		GetTVsByGenre(ctx context.Context, genreIDs []int, page int) (types.Content, error)
 	}
 
-	ContentProvider interface {
+	GenreProvider interface {
+		GetGenres(ctx context.Context, contentType types.ContentType) (types.Genres, error)
+	}
+
+	DataProvider interface {
 		MovieProvider
 		TVProvider
+		GenreProvider
 
 		SearchByTitles(ctx context.Context, titles []string) (types.Content, error)
 	}
@@ -62,8 +70,8 @@ type (
 	}
 
 	TGBot struct {
-		storer  Storer
-		content ContentProvider
+		storer Storer
+		api    DataProvider
 
 		bot *bot.Bot
 
@@ -75,10 +83,10 @@ type (
 	}
 )
 
-func New(cfg *config.Config, log *slog.Logger, storer Storer, contentProvider ContentProvider) (*TGBot, error) {
+func New(cfg *config.Config, log *slog.Logger, storer Storer, api DataProvider) (*TGBot, error) {
 	tgbot := &TGBot{
-		storer:  storer,
-		content: contentProvider,
+		storer: storer,
+		api:    api,
 
 		log: log.With("pkg", "botkit"),
 		cfg: cfg,
@@ -123,6 +131,8 @@ func (t *TGBot) useHandlers() {
 
 	t.bot.RegisterHandler(bot.HandlerTypeMessageText, "/f", bot.MatchTypePrefix, t.searchByIDHandler)
 	t.bot.RegisterHandler(bot.HandlerTypeMessageText, "/t", bot.MatchTypePrefix, t.searchByIDHandler)
+	t.bot.RegisterHandler(bot.HandlerTypeMessageText, "/gf", bot.MatchTypePrefix, t.onContentByGenreHandler(t.showMovieByGenre, MovieByGenre))
+	t.bot.RegisterHandler(bot.HandlerTypeMessageText, "/gt", bot.MatchTypePrefix, t.onContentByGenreHandler(t.showTVByGenre, TVByGenre))
 }
 
 func (t *TGBot) sendErrorMessage(ctx context.Context, chatID int64) {
@@ -130,4 +140,30 @@ func (t *TGBot) sendErrorMessage(ctx context.Context, chatID int64) {
 		ChatID: chatID,
 		Text:   "Произошла ошибка. Попробуйте ещё раз позднее...",
 	})
+}
+
+func (t *TGBot) generateSlider(content types.Content, opts []slider.Option) *slider.Slider {
+	log := t.log.With("fn", "generateSlider")
+	log.Info("generating slides", "count", len(content))
+
+	limit := 50
+	if len(content) > limit {
+		log.Warn("too many slides.", "limit", limit, "count", len(content))
+		content = content[:limit]
+	}
+
+	slides := make([]slider.Slide, 0, limit)
+
+	for _, r := range content {
+		// log.Debug("generating slide", "title", r.Title, "short string", r.ShortString())
+		slides = append(slides, slider.Slide{
+			Photo: r.PosterPath,
+			Text:  r.GetShortInfo(),
+		})
+	}
+
+	if opts == nil {
+		opts = []slider.Option{}
+	}
+	return slider.New(slides, opts...)
 }

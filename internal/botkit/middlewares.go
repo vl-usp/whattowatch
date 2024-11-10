@@ -31,7 +31,7 @@ func (t *TGBot) userDataMiddleware(next bot.HandlerFunc) bot.HandlerFunc {
 
 			b.SendMessage(ctx, &bot.SendMessageParams{
 				ChatID:      id,
-				Text:        "Выберите тип контента, который хотите посмотреть",
+				Text:        "Выберите тип контента",
 				ReplyMarkup: entry.replyKeyboard,
 			})
 		}

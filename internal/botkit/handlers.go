@@ -7,13 +7,16 @@ import (
 	"strings"
 	"time"
 	"whattowatch/internal/types"
+	"whattowatch/internal/utils"
 
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
 	"github.com/go-telegram/ui/keyboard/inline"
+	"github.com/go-telegram/ui/slider"
 )
 
 type modifyUserContentFunc func(ctx context.Context, userID int64, item types.ContentItem) error
+type showContentByGenreFunc func(ctx context.Context, chatID int64, userData UserData, genreID int)
 
 func (t *TGBot) registerHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
 	log := t.log.With("fn", "registerHandler", "user_id", update.Message.From.ID, "chat_id", update.Message.Chat.ID)
@@ -73,7 +76,7 @@ func (t *TGBot) searchByTitleHandler(ctx context.Context, b *bot.Bot, update *mo
 		titles = append(titles, strings.TrimSpace(title))
 	}
 
-	res, err := t.content.SearchByTitles(ctx, titles)
+	res, err := t.api.SearchByTitles(ctx, titles)
 	if err != nil {
 		log.Error("failed to get movies", "error", err.Error())
 		t.sendErrorMessage(ctx, update.Message.Chat.ID)
@@ -108,9 +111,9 @@ func (t *TGBot) searchByIDHandler(ctx context.Context, b *bot.Bot, update *model
 	var contentItem types.ContentItem
 	switch contentType {
 	case "/f":
-		contentItem, err = t.content.GetMovie(ctx, id)
+		contentItem, err = t.api.GetMovie(ctx, id)
 	case "/t":
-		contentItem, err = t.content.GetTV(ctx, id)
+		contentItem, err = t.api.GetTV(ctx, id)
 	}
 	if err != nil {
 		log.Error("failed to get content item", "error", err.Error())
@@ -126,12 +129,12 @@ func (t *TGBot) searchByIDHandler(ctx context.Context, b *bot.Bot, update *model
 	}
 
 	serializedItem := types.SerializeContentItem(contentItem)
-	kb := t.getInlineKeyboard(cs, serializedItem)
+	kb := t.getContentActionKeyboard(cs, serializedItem)
 
 	_, err = b.SendPhoto(ctx, &bot.SendPhotoParams{
 		ChatID:      update.Message.Chat.ID,
 		Photo:       &models.InputFileString{Data: contentItem.PosterPath},
-		Caption:     contentItem.String(),
+		Caption:     contentItem.GetInfo(),
 		ParseMode:   "Markdown",
 		ReplyMarkup: kb,
 	})
@@ -168,12 +171,12 @@ func (t *TGBot) onContentActionEvent(fn modifyUserContentFunc) inline.OnSelect {
 			return
 		}
 
-		kb := t.getInlineKeyboard(cs, data)
+		kb := t.getContentActionKeyboard(cs, data)
 
 		_, err = b.SendPhoto(ctx, &bot.SendPhotoParams{
 			ChatID:      mes.Message.Chat.ID,
 			Photo:       &models.InputFileString{Data: item.PosterPath},
-			Caption:     item.String(),
+			Caption:     item.GetInfo(),
 			ParseMode:   "Markdown",
 			ReplyMarkup: kb,
 		})
@@ -185,19 +188,109 @@ func (t *TGBot) onContentActionEvent(fn modifyUserContentFunc) inline.OnSelect {
 	}
 }
 
-func (t *TGBot) getInlineKeyboard(contentStatus types.ContentStatus, data []byte) *inline.Keyboard {
-	kb := inline.New(t.bot).Row()
-	if contentStatus.IsFavorite {
-		kb = kb.Button("Удалить из избранных", data, t.onContentActionEvent(t.storer.RemoveContentItemFromFavorite))
-	} else {
-		kb = kb.Button("Добавить в избранные", data, t.onContentActionEvent(t.storer.AddContentItemToFavorite))
+func (t *TGBot) onContentByGenreHandler(fn showContentByGenreFunc, page Page) bot.HandlerFunc {
+	return func(ctx context.Context, b *bot.Bot, update *models.Update) {
+		userID := update.Message.From.ID
+		chatID := update.Message.Chat.ID
+
+		log := t.log.With("fn", "onContentByGenreHandler", "user_id", userID, "chat_id", chatID)
+		log.Debug("handler func start log")
+
+		genreIDStr := update.Message.Text[3:]
+		genreID, err := strconv.Atoi(genreIDStr)
+		if err != nil {
+			log.Error("failed to parse genre id", "error", err.Error())
+			t.sendErrorMessage(ctx, chatID)
+			return
+		}
+
+		t.mu.RLock()
+		userData, exists := t.userData[userID]
+		t.mu.RUnlock()
+
+		if !exists {
+			log.Debug("user not found in userData map")
+			return
+		}
+
+		userData.pagesMap[page] = 1
+
+		t.mu.Lock()
+		t.userData[userID] = userData
+		t.mu.Unlock()
+
+		fn(ctx, chatID, userData, genreID)
+	}
+}
+
+func (t *TGBot) onContentGenrePageHandler(fn showContentByGenreFunc, page Page, genreID int) slider.OnCancelFunc {
+	return func(ctx context.Context, b *bot.Bot, message models.MaybeInaccessibleMessage) {
+		chatID := message.Message.Chat.ID
+
+		log := t.log.With("fn", "onContentGenrePageHandler", "chat_id", chatID)
+		log.Debug("handler func start log")
+
+		t.mu.RLock()
+		userData, exists := t.userData[chatID]
+		t.mu.RUnlock()
+
+		if !exists {
+			log.Debug("user not found in userData map")
+			return
+		}
+
+		userData.pagesMap[page] = utils.HandlePage(userData.pagesMap[page], "next")
+
+		t.mu.Lock()
+		t.userData[chatID] = userData
+		t.mu.Unlock()
+
+		fn(ctx, chatID, userData, genreID)
+	}
+}
+
+func (t *TGBot) showMovieByGenre(ctx context.Context, chatID int64, userData UserData, genreID int) {
+	log := t.log.With("fn", "showMoviesByGenre", "chat_id", chatID)
+	log.Debug("handler func start log")
+
+	movies, err := t.api.GetMoviesByGenre(ctx, []int{genreID}, userData.pagesMap[MovieByGenre])
+	if err != nil {
+		log.Error("failed to get content", "error", err.Error())
+		t.sendErrorMessage(ctx, chatID)
+		return
 	}
 
-	if contentStatus.IsViewed {
-		kb = kb.Button("Удалить из просмотренных", data, t.onContentActionEvent(t.storer.RemoveContentItemFromViewed))
-	} else {
-		kb = kb.Button("Добавить в просмотренные", data, t.onContentActionEvent(t.storer.AddContentItemToViewed))
+	if len(movies) == 0 {
+		t.sendErrorMessage(ctx, chatID)
+		return
 	}
 
-	return kb
+	opts := []slider.Option{
+		slider.OnCancel("Показать еще", true, t.onContentGenrePageHandler(t.showMovieByGenre, MovieByGenre, genreID)),
+	}
+	slides := t.generateSlider(movies, opts)
+	slides.Show(ctx, t.bot, chatID)
+}
+
+func (t *TGBot) showTVByGenre(ctx context.Context, chatID int64, userData UserData, genreID int) {
+	log := t.log.With("fn", "showTVByGenre", "chat_id", chatID)
+	log.Debug("handler func start log")
+
+	movies, err := t.api.GetTVsByGenre(ctx, []int{genreID}, userData.pagesMap[TVByGenre])
+	if err != nil {
+		log.Error("failed to get content", "error", err.Error())
+		t.sendErrorMessage(ctx, chatID)
+		return
+	}
+
+	if len(movies) == 0 {
+		t.sendErrorMessage(ctx, chatID)
+		return
+	}
+
+	opts := []slider.Option{
+		slider.OnCancel("Показать еще", true, t.onContentGenrePageHandler(t.showTVByGenre, TVByGenre, genreID)),
+	}
+	slides := t.generateSlider(movies, opts)
+	slides.Show(ctx, t.bot, chatID)
 }

@@ -1,7 +1,11 @@
 package types
 
 import (
+	"fmt"
 	"strings"
+
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 type Genre struct {
@@ -29,4 +33,27 @@ func (g Genres) GetIDs() []int64 {
 		ids = append(ids, genre.ID)
 	}
 	return ids
+}
+
+func (genres Genres) GetInfo(contentType ContentType) string {
+	builder := strings.Builder{}
+
+	var prefix, title string
+
+	switch contentType {
+	case Movie:
+		prefix = "/gf"
+		title = "*Фильмы. Выберите жанр:*"
+	case TV:
+		prefix = "/gt"
+		title = "*Сериалы. Выберите жанр:*"
+	}
+
+	caser := cases.Title(language.Russian)
+
+	builder.WriteString(fmt.Sprintf("%s\n", title))
+	for _, g := range genres {
+		builder.WriteString(fmt.Sprintf("%s (%s%d)\n", caser.String(g.Name), prefix, g.ID))
+	}
+	return builder.String()
 }

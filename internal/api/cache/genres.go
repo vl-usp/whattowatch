@@ -20,6 +20,12 @@ func (c *Genres) Set(key int64, value string) {
 	c.data[key] = value
 }
 
+func (c *Genres) GetAll() map[int64]string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.data
+}
+
 func (c *Genres) Get(key int64) (string, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()

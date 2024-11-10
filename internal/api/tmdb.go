@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 	"whattowatch/internal/api/cache"
 	"whattowatch/internal/config"
@@ -48,7 +49,7 @@ func New(cfg *config.Config, log *slog.Logger) (*TMDbApi, error) {
 		return nil, err
 	}
 	c.SetClientAutoRetry()
-	c.SetAlternateBaseURL()
+	// c.SetAlternateBaseURL()
 
 	api := &TMDbApi{
 		client: c,
@@ -58,10 +59,10 @@ func New(cfg *config.Config, log *slog.Logger) (*TMDbApi, error) {
 		log: log.With("pkg", "api"),
 	}
 
-	err = api.testConnection()
-	if err != nil {
-		return nil, err
-	}
+	// err = api.testConnection()
+	// if err != nil {
+	// 	return nil, err
+	// }
 
 	api.initCache()
 	return api, nil
@@ -93,7 +94,7 @@ func (a *TMDbApi) initCache() error {
 			return err
 		}
 		for _, genre := range genres.Genres {
-			a.cache.Genres.Set(genre.ID, genre.Name)
+			a.cache.Genres.Movie.Set(genre.ID, genre.Name)
 		}
 		return nil
 	})
@@ -104,7 +105,7 @@ func (a *TMDbApi) initCache() error {
 			return err
 		}
 		for _, genre := range tvs.Genres {
-			a.cache.Genres.Set(genre.ID, genre.Name)
+			a.cache.Genres.TV.Set(genre.ID, genre.Name)
 		}
 
 		return nil
@@ -112,19 +113,29 @@ func (a *TMDbApi) initCache() error {
 
 	err := g.Wait()
 
-	a.log.Debug("genres loaded", "genres", a.cache.Genres)
+	a.log.Debug("genres loaded", "movies", a.cache.Genres.Movie, "tv", a.cache.Genres.TV)
 
 	return err
 }
 
-func (a *TMDbApi) getGenresByIDs(ids []int64) types.Genres {
+func (a *TMDbApi) getGenresByIDs(ids []int64, contentType types.ContentType) types.Genres {
 	genres := make(types.Genres, 0, len(ids))
 	for _, id := range ids {
-		if g, ok := a.cache.Genres.Get(id); ok {
-			genres = append(genres, types.Genre{
-				ID:   id,
-				Name: g,
-			})
+		switch contentType {
+		case types.Movie:
+			if g, ok := a.cache.Genres.Movie.Get(id); ok {
+				genres = append(genres, types.Genre{
+					ID:   id,
+					Name: g,
+				})
+			}
+		case types.TV:
+			if g, ok := a.cache.Genres.TV.Get(id); ok {
+				genres = append(genres, types.Genre{
+					ID:   id,
+					Name: g,
+				})
+			}
 		}
 	}
 
@@ -132,7 +143,7 @@ func (a *TMDbApi) getGenresByIDs(ids []int64) types.Genres {
 }
 
 func (a *TMDbApi) GetMovie(ctx context.Context, id int) (types.ContentItem, error) {
-	log := a.log.With("method", "GetMovie", "id", id)
+	log := a.log.With("fn", "GetMovie", "id", id)
 	m, err := a.client.GetMovieDetails(id, a.opts)
 	if err != nil {
 		return types.ContentItem{}, err
@@ -164,7 +175,7 @@ func (a *TMDbApi) GetMovie(ctx context.Context, id int) (types.ContentItem, erro
 }
 
 func (a *TMDbApi) GetMovies(ctx context.Context, ids []int64) (types.Content, error) {
-	log := a.log.With("method", "GetMovies")
+	log := a.log.With("fn", "GetMovies")
 	content := make(types.Content, 0, len(ids))
 
 	jobCh := make(chan int64, len(ids))
@@ -202,7 +213,7 @@ func (a *TMDbApi) GetMovies(ctx context.Context, ids []int64) (types.Content, er
 }
 
 func (a *TMDbApi) GetTV(ctx context.Context, id int) (types.ContentItem, error) {
-	log := a.log.With("method", "GetTV", "id", id)
+	log := a.log.With("fn", "GetTV", "id", id)
 	tv, err := a.client.GetTVDetails(id, a.opts)
 	if err != nil {
 		return types.ContentItem{}, err
@@ -234,7 +245,7 @@ func (a *TMDbApi) GetTV(ctx context.Context, id int) (types.ContentItem, error) 
 }
 
 func (a *TMDbApi) GetTVs(ctx context.Context, ids []int64) (types.Content, error) {
-	log := a.log.With("method", "GetTVs")
+	log := a.log.With("fn", "GetTVs")
 	content := make(types.Content, 0, len(ids))
 
 	jobCh := make(chan int64, len(ids))
@@ -431,7 +442,7 @@ func (a *TMDbApi) GetTVTop(ctx context.Context, page int) (types.Content, error)
 }
 
 func (a *TMDbApi) GetMovieRecommendations(ctx context.Context, ids []int64) (types.Content, error) {
-	log := a.log.With("method", "GetMovieRecomendations")
+	log := a.log.With("fn", "GetMovieRecomendations")
 
 	jobCh := make(chan int64, len(ids))
 	movieCh := make(chan content, len(ids))
@@ -482,7 +493,7 @@ func (a *TMDbApi) GetMovieRecommendations(ctx context.Context, ids []int64) (typ
 						ReleaseDate: rd,
 						VoteAverage: v.VoteAverage,
 						VoteCount:   v.VoteCount,
-						Genres:      a.getGenresByIDs(v.GenreIDs),
+						Genres:      a.getGenresByIDs(v.GenreIDs, types.Movie),
 					})
 				}
 
@@ -513,7 +524,7 @@ func (a *TMDbApi) GetMovieRecommendations(ctx context.Context, ids []int64) (typ
 }
 
 func (a *TMDbApi) GetTVRecommendations(ctx context.Context, ids []int64) (types.Content, error) {
-	log := a.log.With("method", "GetTVRecomendations")
+	log := a.log.With("fn", "GetTVRecomendations")
 
 	jobCh := make(chan int64, len(ids))
 	tvCh := make(chan content, len(ids))
@@ -564,7 +575,7 @@ func (a *TMDbApi) GetTVRecommendations(ctx context.Context, ids []int64) (types.
 						ReleaseDate: rd,
 						VoteAverage: v.VoteAverage,
 						VoteCount:   v.VoteCount,
-						Genres:      a.getGenresByIDs(v.GenreIDs),
+						Genres:      a.getGenresByIDs(v.GenreIDs, types.Movie),
 					})
 				}
 
@@ -621,7 +632,7 @@ func (a *TMDbApi) SearchByTitles(ctx context.Context, titles []string) (types.Co
 }
 
 func (a *TMDbApi) searchMovieByTitle(_ context.Context, titles []string) (types.Content, error) {
-	log := a.log.With("method", "SearchMovieByTitle")
+	log := a.log.With("fn", "SearchMovieByTitle")
 
 	jobCh := make(chan string, len(titles))
 	movieCh := make(chan content, len(titles))
@@ -697,7 +708,7 @@ func (a *TMDbApi) searchMovieByTitle(_ context.Context, titles []string) (types.
 }
 
 func (a *TMDbApi) searchTVByTitle(_ context.Context, titles []string) (types.Content, error) {
-	log := a.log.With("method", "SearchTVByTitle")
+	log := a.log.With("fn", "SearchTVByTitle")
 
 	jobCh := make(chan string, len(titles))
 	tvCh := make(chan content, len(titles))
@@ -770,4 +781,117 @@ func (a *TMDbApi) searchTVByTitle(_ context.Context, titles []string) (types.Con
 	}
 
 	return result, nil
+}
+
+func (a *TMDbApi) GetGenres(ctx context.Context, contentType types.ContentType) (types.Genres, error) {
+	log := a.log.With("fn", "GetGenres", "content_type", contentType)
+	log.Debug("func start log")
+
+	var genresMap map[int64]string
+	switch contentType {
+	case types.Movie:
+		genresMap = a.cache.Genres.Movie.GetAll()
+	case types.TV:
+		genresMap = a.cache.Genres.TV.GetAll()
+	}
+
+	res := make(types.Genres, 0, len(genresMap))
+	for k, v := range genresMap {
+		res = append(res, types.Genre{
+			ID:   k,
+			Name: v,
+		})
+	}
+
+	return res, nil
+}
+
+func (a *TMDbApi) GetMoviesByGenre(ctx context.Context, genreIDs []int, page int) (types.Content, error) {
+	log := a.log.With("fn", "DiscoverMovies", "page", page, "genres", genreIDs)
+
+	a.opts["page"] = fmt.Sprintf("%d", page)
+	a.opts["with_genres"] = strings.Join(utils.IntSliceToStringSlice(genreIDs), ",")
+	defer delete(a.opts, "page")
+	defer delete(a.opts, "with_genres")
+
+	m, err := a.client.GetDiscoverMovie(a.opts)
+	if err != nil {
+		return nil, err
+	}
+	log.Info("got discover movies", "count", len(m.Results))
+
+	res := make(types.Content, 0, len(m.Results))
+
+	for _, v := range m.Results {
+		rd, err := utils.GetReleaseDate(v.ReleaseDate)
+		if err != nil {
+			log.Warn("get release date error", "id", v.ID, "error", err.Error())
+			continue
+		}
+
+		poster := a.cfg.Urls.TMDbImageUrl + v.PosterPath
+		if v.PosterPath == "" {
+			log.Warn("empty poster path", "id", v.ID)
+			poster = emptyImageUrl
+		}
+
+		res = append(res, types.ContentItem{
+			ID:          v.ID,
+			ContentType: types.Movie,
+			Title:       v.Title,
+			Overview:    v.Overview,
+			Popularity:  v.Popularity,
+			PosterPath:  poster,
+			ReleaseDate: rd,
+			VoteAverage: v.VoteAverage,
+			VoteCount:   v.VoteCount,
+		})
+	}
+
+	return res, nil
+}
+
+func (a *TMDbApi) GetTVsByGenre(ctx context.Context, genreIDs []int, page int) (types.Content, error) {
+	log := a.log.With("fn", "DiscoverTV", "page", page, "genres", genreIDs)
+
+	a.opts["page"] = fmt.Sprintf("%d", page)
+	a.opts["with_genres"] = strings.Join(utils.IntSliceToStringSlice(genreIDs), ",")
+	defer delete(a.opts, "page")
+	defer delete(a.opts, "with_genres")
+
+	m, err := a.client.GetDiscoverTV(a.opts)
+	if err != nil {
+		return nil, err
+	}
+	log.Info("got discover tv", "count", len(m.Results))
+
+	res := make(types.Content, 0, len(m.Results))
+
+	for _, v := range m.Results {
+		rd, err := utils.GetReleaseDate(v.FirstAirDate)
+		if err != nil {
+			log.Warn("get release date error", "id", v.ID, "error", err.Error())
+			continue
+		}
+
+		poster := a.cfg.Urls.TMDbImageUrl + v.PosterPath
+		if v.PosterPath == "" {
+			log.Warn("empty poster path", "id", v.ID)
+			poster = emptyImageUrl
+		}
+
+		res = append(res, types.ContentItem{
+			ID:          v.ID,
+			ContentType: types.TV,
+			Title:       v.Name,
+			Overview:    v.Overview,
+			Popularity:  v.Popularity,
+			PosterPath:  poster,
+			ReleaseDate: rd,
+			VoteAverage: v.VoteAverage,
+			VoteCount:   v.VoteCount,
+		})
+	}
+
+	return res, nil
 }
