@@ -39,9 +39,10 @@ jobs:
             # Change directory
             cd ${{ env.DIRECTORY }}
 
-            # Stop docker compose
-            docker compose down
+            # Build docker images
+            docker compose build
 
-            # Run docker compose
-            docker compose up -d --build
+            # Restart docker compose
+            docker compose down
+            docker compose up -d
 
