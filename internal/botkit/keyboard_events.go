@@ -98,7 +98,7 @@ func (t *TGBot) onContentPageEvent(fn getRatingDataFunc, page Page) slider.OnCan
 	}
 }
 
-func (t *TGBot) onUserContentEvent(emptyMessage string, contentType types.ContentType, userContentFn getUserContentIDsFunc, getContentFn getContentByIDsFunc) bot.HandlerFunc {
+func (t *TGBot) onUserContentEvent(userContentFn getUserContentIDsFunc, getContentFn getContentByIDsFunc, contentType types.ContentType, emptyMessage string) bot.HandlerFunc {
 	return func(ctx context.Context, b *bot.Bot, update *models.Update) {
 		userID := update.Message.From.ID
 		chatID := update.Message.Chat.ID
