@@ -26,7 +26,7 @@ jobs:
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_KEY }}
           source: "."
-          target: $DIRECTORY
+          target: ${{ env.DIRECTORY }}
 
       - name: Start project
         uses: appleboy/ssh-action@master
@@ -36,7 +36,7 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           script: |
             # Change directory
-            cd $DIRECTORY
+            cd ${{ env.DIRECTORY }}
 
             # Stop docker compose
             docker compose down
