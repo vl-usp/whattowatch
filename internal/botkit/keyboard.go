@@ -55,7 +55,7 @@ func (t *TGBot) getTVsKeyboard() *reply.ReplyKeyboard {
 		Button("Лучшие 📺", t.bot, bot.MatchTypeExact, t.onContentEvent(t.showTVTop, TVTop)).
 		Button("Жанры 📺", t.bot, bot.MatchTypePrefix, t.onGetGenresEvent(types.TV)).
 		Row().
-		Button("Рекомендации 📺", t.bot, bot.MatchTypeExact, t.onRecommendationsEvent(t.api.GetTVRecommendations, types.Movie)).
+		Button("Рекомендации 📺", t.bot, bot.MatchTypeExact, t.onRecommendationsEvent(t.api.GetTVRecommendations, types.TV)).
 		Button("Избранные 📺", t.bot, bot.MatchTypeExact, t.onUserContentEvent(t.storer.GetFavoriteContentIDs, t.api.GetTVs, types.TV, "У вас нет избранных сериалов")).
 		Button("Просмотренные 📺", t.bot, bot.MatchTypeExact, t.onUserContentEvent(t.storer.GetViewedContentIDs, t.api.GetTVs, types.TV, "У вас нет просмотренных сериалов")).
 		Row().

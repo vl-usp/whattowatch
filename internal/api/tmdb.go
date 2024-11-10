@@ -498,7 +498,7 @@ func (a *TMDbApi) GetMovieRecommendations(ctx context.Context, ids []int64) (typ
 				res, err := a.client.GetMovieRecommendations(int(job), a.opts)
 				log.Info("request to TMDb", "worker_id", id, "movie_id", job)
 				if err != nil {
-					log.Error("request error", "id", id, "error", err.Error())
+					log.Error("request error", "id", id, "movie_id", job, "error", err.Error())
 					movieCh <- content{
 						err: err,
 					}
@@ -581,7 +581,7 @@ func (a *TMDbApi) GetTVRecommendations(ctx context.Context, ids []int64) (types.
 				res, err := a.client.GetTVRecommendations(int(job), a.opts)
 				log.Info("request to TMDb", "worker_id", id, "tv_id", job)
 				if err != nil {
-					log.Error("request error", "id", id, "error", err.Error())
+					log.Error("request error", "id", id, "tv_id", job, "error", err.Error())
 					tvCh <- content{
 						err: err,
 					}
