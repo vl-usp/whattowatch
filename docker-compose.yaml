@@ -23,8 +23,6 @@ services:
       dockerfile: migration.Dockerfile
     container_name: whattowatch-migrator
     restart: on-failure
-    environment:
-      DB_HOST: pg
     depends_on:
       - pg
     networks:
@@ -35,7 +33,7 @@ services:
       context: .
       dockerfile: loader.Dockerfile
     container_name: whattowatch-loader
-    # restart: always
+    restart: always
     depends_on:
       - pg
       - migrator
@@ -47,7 +45,7 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: whattowatch-bot
-    # restart: always
+    restart: always
     depends_on:
       - pg
     networks:
