@@ -27,7 +27,7 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           source: "."
           target: ${{ env.DIRECTORY }}
-          timeou: 120s
+          timeout: 120s
 
       - name: Start project
         uses: appleboy/ssh-action@master
