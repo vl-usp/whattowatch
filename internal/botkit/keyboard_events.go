@@ -98,7 +98,7 @@ func (t *TGBot) onContentPageEvent(fn getRatingDataFunc, page Page) slider.OnCan
 	}
 }
 
-func (t *TGBot) onUserContentEvent(emptyMessage string, userContentFn getUserContentIDsFunc, getContentFn getContentByIDsFunc) bot.HandlerFunc {
+func (t *TGBot) onUserContentEvent(emptyMessage string, contentType types.ContentType, userContentFn getUserContentIDsFunc, getContentFn getContentByIDsFunc) bot.HandlerFunc {
 	return func(ctx context.Context, b *bot.Bot, update *models.Update) {
 		userID := update.Message.From.ID
 		chatID := update.Message.Chat.ID
@@ -106,7 +106,7 @@ func (t *TGBot) onUserContentEvent(emptyMessage string, userContentFn getUserCon
 		log := t.log.With("fn", "onUserContentEvent", "user_id", userID, "chat_id", chatID)
 		log.Debug("handler func start log")
 
-		userContentIDs, err := userContentFn(ctx, userID, types.Movie)
+		userContentIDs, err := userContentFn(ctx, userID, contentType)
 		if err != nil {
 			log.Error("failed to get user content ids", "error", err.Error())
 			t.sendErrorMessage(ctx, chatID)

@@ -35,8 +35,8 @@ func (t *TGBot) getMoviesKeyboard() *reply.ReplyKeyboard {
 		Button("Популярные 🎥", t.bot, bot.MatchTypeExact, t.onContentEvent(t.getMoviePopular, MoviePopular)).
 		Button("Лучшие 🎥", t.bot, bot.MatchTypeExact, t.onContentEvent(t.getMovieTop, MovieTop)).
 		Row().
-		Button("Избранные 🎥", t.bot, bot.MatchTypeExact, t.onUserContentEvent("У вас нет избранных фильмов", t.storer.GetFavoriteContentIDs, t.content.GetMovies)).
-		Button("Просмотренные 🎥", t.bot, bot.MatchTypeExact, t.onUserContentEvent("У вас нет просмотренных фильмов", t.storer.GetViewedContentIDs, t.content.GetMovies)).
+		Button("Избранные 🎥", t.bot, bot.MatchTypeExact, t.onUserContentEvent("У вас нет избранных фильмов", types.Movie, t.storer.GetFavoriteContentIDs, t.content.GetMovies)).
+		Button("Просмотренные 🎥", t.bot, bot.MatchTypeExact, t.onUserContentEvent("У вас нет просмотренных фильмов", types.Movie, t.storer.GetViewedContentIDs, t.content.GetMovies)).
 		Row().
 		Button("🔙 Назад", t.bot, bot.MatchTypePrefix, t.onKeyboardChangeEvent("Выберите тип контента", t.getMainKeyboard))
 
@@ -53,8 +53,8 @@ func (t *TGBot) getTVsKeyboard() *reply.ReplyKeyboard {
 		Button("Популярные 📺", t.bot, bot.MatchTypeExact, t.onContentEvent(t.getTVPopular, TVPopular)).
 		Button("Лучшие 📺", t.bot, bot.MatchTypeExact, t.onContentEvent(t.getTVTop, TVTop)).
 		Row().
-		Button("Избранные 📺", t.bot, bot.MatchTypeExact, t.onUserContentEvent("У вас нет избранных сериалов", t.storer.GetFavoriteContentIDs, t.content.GetTVs)).
-		Button("Просмотренные 📺", t.bot, bot.MatchTypeExact, t.onUserContentEvent("У вас нет просмотренных сериалов", t.storer.GetViewedContentIDs, t.content.GetTVs)).
+		Button("Избранные 📺", t.bot, bot.MatchTypeExact, t.onUserContentEvent("У вас нет избранных сериалов", types.TV, t.storer.GetFavoriteContentIDs, t.content.GetTVs)).
+		Button("Просмотренные 📺", t.bot, bot.MatchTypeExact, t.onUserContentEvent("У вас нет просмотренных сериалов", types.TV, t.storer.GetViewedContentIDs, t.content.GetTVs)).
 		Row().
 		Button("🔙 Назад", t.bot, bot.MatchTypePrefix, t.onKeyboardChangeEvent("Выберите тип контента", t.getMainKeyboard))
 
