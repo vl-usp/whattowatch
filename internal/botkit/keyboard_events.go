@@ -128,8 +128,7 @@ func (t *TGBot) onUserContentEvent(emptyMessage string, userContentFn getUserCon
 			return
 		}
 
-		opts := []slider.Option{}
-		sl := t.generateSlider(content, opts)
+		sl := t.generateSlider(content, nil)
 		sl.Show(ctx, b, chatID)
 	}
 }
@@ -176,8 +175,7 @@ func (t *TGBot) onRecommendationsEvent(getContentFn getContentByIDsFunc, content
 			return
 		}
 
-		opts := []slider.Option{}
-		sl := t.generateSlider(recomendations, opts)
+		sl := t.generateSlider(recomendations, nil)
 		sl.Show(ctx, b, chatID)
 	}
 }
@@ -197,7 +195,6 @@ func (t *TGBot) getMoviePopular(ctx context.Context, chatID int64, userData User
 	}
 
 	opts := []slider.Option{
-		slider.WithPrefix("slider_movie_popular"),
 		slider.OnCancel("Показать еще", true, t.onContentPageEvent(t.getMoviePopular, MoviePopular)),
 	}
 	slides := t.generateSlider(m, opts)
@@ -219,7 +216,6 @@ func (t *TGBot) getMovieTop(ctx context.Context, chatID int64, userData UserData
 	}
 
 	opts := []slider.Option{
-		slider.WithPrefix("slider_movie_top"),
 		slider.OnCancel("Показать еще", true, t.onContentPageEvent(t.getMovieTop, MovieTop)),
 	}
 
@@ -242,7 +238,6 @@ func (t *TGBot) getTVPopular(ctx context.Context, chatID int64, userData UserDat
 	}
 
 	opts := []slider.Option{
-		slider.WithPrefix("slider_tv_popular"),
 		slider.OnCancel("Показать еще", true, t.onContentPageEvent(t.getTVPopular, TVPopular)),
 	}
 	slides := t.generateSlider(content, opts)
@@ -266,7 +261,6 @@ func (t *TGBot) getTVTop(ctx context.Context, chatID int64, userData UserData) {
 
 	opts := []slider.Option{
 		slider.OnCancel("Показать еще", true, t.onContentPageEvent(t.getTVTop, TVTop)),
-		slider.WithPrefix("slider_tv_top"),
 	}
 	slides := t.generateSlider(content, opts)
 	slides.Show(ctx, t.bot, chatID)

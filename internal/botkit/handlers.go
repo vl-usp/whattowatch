@@ -11,7 +11,6 @@ import (
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
 	"github.com/go-telegram/ui/keyboard/inline"
-	"github.com/go-telegram/ui/slider"
 )
 
 type modifyUserContentFunc func(ctx context.Context, userID int64, item types.ContentItem) error
@@ -89,10 +88,7 @@ func (t *TGBot) searchByTitleHandler(ctx context.Context, b *bot.Bot, update *mo
 		return
 	}
 
-	opts := []slider.Option{
-		slider.WithPrefix("slider_movie_search"),
-	}
-	sl := t.generateSlider(res, opts)
+	sl := t.generateSlider(res, nil)
 	sl.Show(ctx, b, update.Message.Chat.ID)
 }
 
