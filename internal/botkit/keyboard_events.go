@@ -23,7 +23,7 @@ func (t *TGBot) handlerReplyKeyboard(ctx context.Context, b *bot.Bot, update *mo
 	if ok {
 		b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID:      update.Message.Chat.ID,
-			Text:        "Выберите тип контента, который хотите посмотреть",
+			Text:        "Выберите тип контента",
 			ReplyMarkup: entry.replyKeyboard,
 		})
 	}
@@ -142,8 +142,13 @@ func (t *TGBot) onUserContentEvent(userContentFn getUserContentIDsFunc, getConte
 			return
 		}
 
-		sl := t.generateSlider(content, nil)
-		sl.Show(ctx, b, chatID)
+		slides := t.generateSlider(content, nil)
+		_, err = slides.Show(ctx, t.bot, chatID)
+		if err != nil {
+			log.Error("failed to show slider", "error", err.Error())
+			t.sendErrorMessage(ctx, chatID)
+			return
+		}
 	}
 }
 
@@ -189,8 +194,13 @@ func (t *TGBot) onRecommendationsEvent(getContentFn getContentByIDsFunc, content
 			return
 		}
 
-		sl := t.generateSlider(recomendations, nil)
-		sl.Show(ctx, b, chatID)
+		slides := t.generateSlider(recomendations, nil)
+		_, err = slides.Show(ctx, t.bot, chatID)
+		if err != nil {
+			log.Error("failed to show slider", "error", err.Error())
+			t.sendErrorMessage(ctx, chatID)
+			return
+		}
 	}
 }
 
@@ -212,7 +222,12 @@ func (t *TGBot) showMoviePopular(ctx context.Context, chatID int64, userData Use
 		slider.OnCancel("Показать еще", true, t.onContentPageEvent(t.showMoviePopular, MoviePopular)),
 	}
 	slides := t.generateSlider(m, opts)
-	slides.Show(ctx, t.bot, chatID)
+	_, err = slides.Show(ctx, t.bot, chatID)
+	if err != nil {
+		log.Error("failed to show slider", "error", err.Error())
+		t.sendErrorMessage(ctx, chatID)
+		return
+	}
 }
 
 // showMovieTop retrieves the top-rated movies content from the content service and displays it to the user.
@@ -234,7 +249,12 @@ func (t *TGBot) showMovieTop(ctx context.Context, chatID int64, userData UserDat
 	}
 
 	slides := t.generateSlider(content, opts)
-	slides.Show(ctx, t.bot, chatID)
+	_, err = slides.Show(ctx, t.bot, chatID)
+	if err != nil {
+		log.Error("failed to show slider", "error", err.Error())
+		t.sendErrorMessage(ctx, chatID)
+		return
+	}
 }
 
 // showTVPopular gets popular TV shows and shows them to the user
@@ -255,7 +275,12 @@ func (t *TGBot) showTVPopular(ctx context.Context, chatID int64, userData UserDa
 		slider.OnCancel("Показать еще", true, t.onContentPageEvent(t.showTVPopular, TVPopular)),
 	}
 	slides := t.generateSlider(content, opts)
-	slides.Show(ctx, t.bot, chatID)
+	_, err = slides.Show(ctx, t.bot, chatID)
+	if err != nil {
+		log.Error("failed to show slider", "error", err.Error())
+		t.sendErrorMessage(ctx, chatID)
+		return
+	}
 }
 
 // showTVTop retrieves the top TV shows content from the content service and shows it
@@ -277,7 +302,12 @@ func (t *TGBot) showTVTop(ctx context.Context, chatID int64, userData UserData) 
 		slider.OnCancel("Показать еще", true, t.onContentPageEvent(t.showTVTop, TVTop)),
 	}
 	slides := t.generateSlider(content, opts)
-	slides.Show(ctx, t.bot, chatID)
+	_, err = slides.Show(ctx, t.bot, chatID)
+	if err != nil {
+		log.Error("failed to show slider", "error", err.Error())
+		t.sendErrorMessage(ctx, chatID)
+		return
+	}
 }
 
 func (t *TGBot) onGetGenresEvent(contentType types.ContentType) bot.HandlerFunc {

@@ -12,8 +12,8 @@ import (
 
 func EscapeString(s string) string {
 	m := map[string]string{
-		"_":      "\\_",
-		"*":      "\\*",
+		"_": "\\_",
+		// "*":      "\\*",
 		"[":      "\\[",
 		"]":      "\\]",
 		"(":      "\\(",
@@ -31,8 +31,6 @@ func EscapeString(s string) string {
 		".":      "\\.",
 		"!":      "\\!",
 		"\u00a0": " ",
-		"\r":     "",
-		"\n":     "",
 		":":      "\\:",
 		"–":      "\\-",
 		"«":      "\"",

@@ -6,20 +6,22 @@ import (
 	"encoding/gob"
 	"fmt"
 	"strings"
-	"whattowatch/internal/utils"
 )
 
 type ContentItem struct {
-	ID          int64
-	ContentType ContentType
-	Title       string
-	Overview    string
-	Popularity  float32
-	PosterPath  string
-	ReleaseDate sql.NullTime
-	VoteAverage float32
-	VoteCount   int64
-	Genres      Genres
+	ID           int64
+	ContentType  ContentType
+	Title        string
+	Overview     string
+	Popularity   float32
+	PosterPath   string
+	BackdropPath string
+	ReleaseDate  sql.NullTime
+	VoteAverage  float32
+	VoteCount    int64
+	Genres       Genres
+	TrailerURL   string
+	Counties     []string
 }
 
 func SerializeContentItem(c ContentItem) []byte {
@@ -47,69 +49,51 @@ func UnserializeContentItem(data []byte) (ContentItem, error) {
 }
 
 func (c ContentItem) GetInfo() string {
-	overview := c.Overview
-	if overview == "" {
-		overview = "Описание отсутствует"
-	}
-	// if len([]rune(overview)) > 500 {
-	// 	overview = string([]rune(overview)[:500]) + "..."
-	// }
+	sb := strings.Builder{}
 
-	return fmt.Sprintf(
-		"*ID:* /%s%d\n\n*Название:* %s\n\n*Жанры:* %s\n\n*Дата выхода:* %s\n\n*Популярность:* %s\n\n*Рейтинг:* %s\n\n*Количество оценок:* %d\n\n*Описание:* %s",
-		c.ContentType.Sign(),
-		c.ID,
-		c.Title,
-		c.Genres.String(),
-		c.ReleaseDate.Time.Format("02.01.2006"),
-		fmt.Sprintf("%.2f", c.Popularity),
-		fmt.Sprintf("%.2f", c.VoteAverage),
-		c.VoteCount,
-		overview,
-	)
+	sb.WriteString(fmt.Sprintf("*Название:* %s (%d год", c.Title, c.ReleaseDate.Time.Year()))
+	if len(c.Counties) > 0 {
+		sb.WriteString(fmt.Sprintf("; %s)\n", strings.Join(c.Counties, ", ")))
+	} else {
+		sb.WriteString(")\n")
+	}
+	if len(c.Genres) > 0 {
+		sb.WriteString(fmt.Sprintf("*Жанры:* %s\n", c.Genres.String()))
+	}
+	sb.WriteString(fmt.Sprintf("*Рейтинг:* %s (%d чел.)\n", fmt.Sprintf("%.2f", c.VoteAverage), c.VoteCount))
+	if c.Overview != "" {
+		sb.WriteString(fmt.Sprintf("*Описание:* %s\n", c.Overview))
+	}
+	if c.TrailerURL != "" {
+		sb.WriteString(fmt.Sprintf("[Ссылка на трейлер](%s)", c.TrailerURL))
+	}
+
+	return sb.String()
 }
 
 func (c ContentItem) GetShortInfo() string {
-	overview := c.Overview
-	if overview == "" {
-		overview = "Описание отсутствует"
+	sb := strings.Builder{}
+
+	sb.WriteString(fmt.Sprintf("/%s%d\n", c.ContentType.Sign(), c.ID))
+	sb.WriteString(fmt.Sprintf("*Название:* %s (%d год", c.Title, c.ReleaseDate.Time.Year()))
+	if len(c.Counties) > 0 {
+		sb.WriteString(fmt.Sprintf("; %s)\n", strings.Join(c.Counties, ", ")))
+	} else {
+		sb.WriteString(")\n")
 	}
-	if len([]rune(overview)) > 500 {
-		overview = string([]rune(overview)[:500]) + "..."
+	sb.WriteString(fmt.Sprintf("*Рейтинг:* %s (%d чел.)\n", fmt.Sprintf("%.2f", c.VoteAverage), c.VoteCount))
+	if c.Overview != "" {
+		overview := c.Overview
+		if len([]rune(overview)) > 500 {
+			overview = string([]rune(overview)[:500]) + "..."
+		}
+		sb.WriteString(fmt.Sprintf("*Описание:* %s\n", overview))
 	}
 
-	return fmt.Sprintf(
-		"*ID:* /%s%d\n\n*Название:* %s\n\n*Дата выхода:* %s\n\n*Рейтинг:* %s\n\n*Описание:* %s",
-		c.ContentType.Sign(),
-		c.ID,
-		utils.EscapeString(c.Title),
-		utils.EscapeString(c.ReleaseDate.Time.Format("02.01.2006")),
-		utils.EscapeString(fmt.Sprintf("%.2f", c.VoteAverage)),
-		utils.EscapeString(overview),
-	)
+	return sb.String()
 }
 
 type Content []ContentItem
-
-func (content Content) GetInfo(title string) string {
-	builder := strings.Builder{}
-	builder.WriteString(fmt.Sprintf("%s\n", title))
-	for _, c := range content {
-		switch c.ContentType {
-		case Movie:
-			builder.WriteString("/f")
-		case TV:
-			builder.WriteString("/t")
-		}
-		builder.WriteString(fmt.Sprintf("%d %s (год: %d; популярность: %f; оценка: %f)\n", c.ID, c.Title, c.ReleaseDate.Time.Year(), c.Popularity, c.VoteAverage))
-	}
-	return builder.String()
-}
-
-type IDsWithGenreIDs struct {
-	ID   int64
-	GIDs []int64
-}
 
 func (content Content) IDs() []int64 {
 	ids := make([]int64, 0, len(content))
@@ -117,19 +101,6 @@ func (content Content) IDs() []int64 {
 		ids = append(ids, c.ID)
 	}
 	return ids
-}
-
-func (content Content) IDsWithGenres() []IDsWithGenreIDs {
-	result := make([]IDsWithGenreIDs, 0, len(content))
-
-	for _, c := range content {
-		result = append(result, IDsWithGenreIDs{
-			ID:   c.ID,
-			GIDs: c.Genres.GetIDs(),
-		})
-	}
-
-	return result
 }
 
 func (content Content) RemoveByIDs(ids []int64) Content {

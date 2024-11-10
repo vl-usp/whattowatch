@@ -8,6 +8,7 @@ import (
 	"sync"
 	"whattowatch/internal/config"
 	"whattowatch/internal/types"
+	"whattowatch/internal/utils"
 
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/ui/slider"
@@ -144,11 +145,11 @@ func (t *TGBot) sendErrorMessage(ctx context.Context, chatID int64) {
 
 func (t *TGBot) generateSlider(content types.Content, opts []slider.Option) *slider.Slider {
 	log := t.log.With("fn", "generateSlider")
-	log.Info("generating slides", "count", len(content))
+	log.Debug("generating slides", "count", len(content))
 
 	limit := 50
 	if len(content) > limit {
-		log.Warn("too many slides.", "limit", limit, "count", len(content))
+		log.Info("too many slides.", "limit", limit, "count", len(content))
 		content = content[:limit]
 	}
 
@@ -158,7 +159,7 @@ func (t *TGBot) generateSlider(content types.Content, opts []slider.Option) *sli
 		// log.Debug("generating slide", "title", r.Title, "short string", r.ShortString())
 		slides = append(slides, slider.Slide{
 			Photo: r.PosterPath,
-			Text:  r.GetShortInfo(),
+			Text:  utils.EscapeString(r.GetShortInfo()),
 		})
 	}
 

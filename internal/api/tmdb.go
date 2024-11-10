@@ -19,10 +19,11 @@ type (
 	TMDbApi struct {
 		client *tmdb.Client
 		cache  *cache.Cache
-		opts   map[string]string
 
 		cfg *config.Config
 		log *slog.Logger
+
+		opts map[string]string
 	}
 
 	content struct {
@@ -144,11 +145,19 @@ func (a *TMDbApi) getGenresByIDs(ids []int64, contentType types.ContentType) typ
 
 func (a *TMDbApi) GetMovie(ctx context.Context, id int) (types.ContentItem, error) {
 	log := a.log.With("fn", "GetMovie", "id", id)
-	m, err := a.client.GetMovieDetails(id, a.opts)
+
+	optsCopy := make(map[string]string, len(a.opts))
+	for k, v := range a.opts {
+		optsCopy[k] = v
+	}
+	optsCopy["append_to_response"] = "videos"
+
+	m, err := a.client.GetMovieDetails(id, optsCopy)
 	if err != nil {
 		return types.ContentItem{}, err
 	}
-	log.Info("got movie details", "id", m.ID, "title", m.Title)
+
+	log.Debug("got movie details", "id", m.ID, "title", m.Title, "opts", optsCopy)
 
 	rd, err := utils.GetReleaseDate(m.ReleaseDate)
 	if err != nil {
@@ -160,17 +169,29 @@ func (a *TMDbApi) GetMovie(ctx context.Context, id int) (types.ContentItem, erro
 		genres = append(genres, types.Genre{ID: genre.ID, Name: genre.Name})
 	}
 
+	var trailerURL string
+	for _, video := range m.Videos.MovieVideos.MovieVideosResults.Results {
+		if video.Type != "Trailer" || !(video.Site == "YouTube" || video.Site == "Youtube") || video.Iso3166_1 != "RU" {
+			continue
+		}
+
+		trailerURL = fmt.Sprintf("https://youtu.be/%s", video.Key)
+	}
+
 	return types.ContentItem{
-		ID:          m.ID,
-		ContentType: types.Movie,
-		Title:       m.Title,
-		Overview:    m.Overview,
-		Popularity:  m.Popularity,
-		PosterPath:  a.cfg.Urls.TMDbImageUrl + m.PosterPath,
-		ReleaseDate: rd,
-		VoteAverage: m.VoteAverage,
-		VoteCount:   m.VoteCount,
-		Genres:      genres,
+		ID:           m.ID,
+		ContentType:  types.Movie,
+		Title:        m.Title,
+		Overview:     m.Overview,
+		Popularity:   m.Popularity,
+		PosterPath:   a.cfg.Urls.TMDbImageUrl + m.PosterPath,
+		BackdropPath: a.cfg.Urls.TMDbImageUrl + m.BackdropPath,
+		ReleaseDate:  rd,
+		VoteAverage:  m.VoteAverage,
+		VoteCount:    m.VoteCount,
+		Genres:       genres,
+		Counties:     m.OriginCountry,
+		TrailerURL:   trailerURL,
 	}, nil
 }
 
@@ -182,7 +203,7 @@ func (a *TMDbApi) GetMovies(ctx context.Context, ids []int64) (types.Content, er
 	movieCh := make(chan contentItem, len(ids))
 	defer close(movieCh)
 
-	log.Info("start working pool", "ids", ids)
+	log.Debug("start working pool", "ids", ids)
 	for i := 0; i < workers; i++ {
 		go func(id int, jobCh <-chan int64, movieCh chan<- contentItem) {
 			for job := range jobCh {
@@ -214,11 +235,18 @@ func (a *TMDbApi) GetMovies(ctx context.Context, ids []int64) (types.Content, er
 
 func (a *TMDbApi) GetTV(ctx context.Context, id int) (types.ContentItem, error) {
 	log := a.log.With("fn", "GetTV", "id", id)
-	tv, err := a.client.GetTVDetails(id, a.opts)
+
+	optsCopy := make(map[string]string, len(a.opts))
+	for k, v := range a.opts {
+		optsCopy[k] = v
+	}
+	optsCopy["append_to_response"] = "videos"
+
+	tv, err := a.client.GetTVDetails(id, optsCopy)
 	if err != nil {
 		return types.ContentItem{}, err
 	}
-	log.Info("got tv details", "id", tv.ID, "title", tv.Name)
+	log.Debug("got tv details", "id", tv.ID, "title", tv.Name)
 
 	rd, err := utils.GetReleaseDate(tv.FirstAirDate)
 	if err != nil {
@@ -230,17 +258,29 @@ func (a *TMDbApi) GetTV(ctx context.Context, id int) (types.ContentItem, error) 
 		genres = append(genres, types.Genre{ID: genre.ID, Name: genre.Name})
 	}
 
+	var trailerURL string
+	for _, video := range tv.Videos.TVVideos.TVVideosResults.Results {
+		if video.Type != "Trailer" || !(video.Site == "YouTube" || video.Site == "Youtube") || video.Iso3166_1 != "RU" {
+			continue
+		}
+
+		trailerURL = fmt.Sprintf("https://youtu.be/%s", video.Key)
+	}
+
 	return types.ContentItem{
-		ID:          tv.ID,
-		ContentType: types.TV,
-		Title:       tv.Name,
-		Overview:    tv.Overview,
-		Popularity:  tv.Popularity,
-		PosterPath:  a.cfg.Urls.TMDbImageUrl + tv.PosterPath,
-		ReleaseDate: rd,
-		VoteAverage: tv.VoteAverage,
-		VoteCount:   tv.VoteCount,
-		Genres:      genres,
+		ID:           tv.ID,
+		ContentType:  types.TV,
+		Title:        tv.Name,
+		Overview:     tv.Overview,
+		Popularity:   tv.Popularity,
+		PosterPath:   a.cfg.Urls.TMDbImageUrl + tv.PosterPath,
+		BackdropPath: a.cfg.Urls.TMDbImageUrl + tv.BackdropPath,
+		ReleaseDate:  rd,
+		VoteAverage:  tv.VoteAverage,
+		VoteCount:    tv.VoteCount,
+		Genres:       genres,
+		Counties:     tv.OriginCountry,
+		TrailerURL:   trailerURL,
 	}, nil
 }
 
@@ -306,15 +346,16 @@ func (a *TMDbApi) GetMoviePopular(ctx context.Context, page int) (types.Content,
 		}
 
 		res = append(res, types.ContentItem{
-			ID:          v.ID,
-			ContentType: types.Movie,
-			Title:       title,
-			Overview:    v.Overview,
-			Popularity:  v.Popularity,
-			PosterPath:  a.cfg.Urls.TMDbImageUrl + v.PosterPath,
-			ReleaseDate: rd,
-			VoteAverage: v.VoteAverage,
-			VoteCount:   v.VoteCount,
+			ID:           v.ID,
+			ContentType:  types.Movie,
+			Title:        title,
+			Overview:     v.Overview,
+			Popularity:   v.Popularity,
+			PosterPath:   a.cfg.Urls.TMDbImageUrl + v.PosterPath,
+			BackdropPath: a.cfg.Urls.TMDbImageUrl + v.BackdropPath,
+			ReleaseDate:  rd,
+			VoteAverage:  v.VoteAverage,
+			VoteCount:    v.VoteCount,
 		})
 	}
 
@@ -346,15 +387,16 @@ func (a *TMDbApi) GetTVPopular(ctx context.Context, page int) (types.Content, er
 		}
 
 		res = append(res, types.ContentItem{
-			ID:          v.ID,
-			ContentType: types.TV,
-			Title:       title,
-			Overview:    v.Overview,
-			Popularity:  v.Popularity,
-			PosterPath:  a.cfg.Urls.TMDbImageUrl + v.PosterPath,
-			ReleaseDate: rd,
-			VoteAverage: v.VoteAverage,
-			VoteCount:   v.VoteCount,
+			ID:           v.ID,
+			ContentType:  types.TV,
+			Title:        title,
+			Overview:     v.Overview,
+			Popularity:   v.Popularity,
+			PosterPath:   a.cfg.Urls.TMDbImageUrl + v.PosterPath,
+			BackdropPath: a.cfg.Urls.TMDbImageUrl + v.BackdropPath,
+			ReleaseDate:  rd,
+			VoteAverage:  v.VoteAverage,
+			VoteCount:    v.VoteCount,
 		})
 	}
 
@@ -386,15 +428,16 @@ func (a *TMDbApi) GetMovieTop(ctx context.Context, page int) (types.Content, err
 		}
 
 		res = append(res, types.ContentItem{
-			ID:          v.ID,
-			ContentType: types.Movie,
-			Title:       title,
-			Overview:    v.Overview,
-			Popularity:  v.Popularity,
-			PosterPath:  a.cfg.Urls.TMDbImageUrl + v.PosterPath,
-			ReleaseDate: rd,
-			VoteAverage: v.VoteAverage,
-			VoteCount:   v.VoteCount,
+			ID:           v.ID,
+			ContentType:  types.Movie,
+			Title:        title,
+			Overview:     v.Overview,
+			Popularity:   v.Popularity,
+			PosterPath:   a.cfg.Urls.TMDbImageUrl + v.PosterPath,
+			BackdropPath: a.cfg.Urls.TMDbImageUrl + v.BackdropPath,
+			ReleaseDate:  rd,
+			VoteAverage:  v.VoteAverage,
+			VoteCount:    v.VoteCount,
 		})
 	}
 
@@ -426,15 +469,16 @@ func (a *TMDbApi) GetTVTop(ctx context.Context, page int) (types.Content, error)
 		}
 
 		res = append(res, types.ContentItem{
-			ID:          v.ID,
-			ContentType: types.TV,
-			Title:       title,
-			Overview:    v.Overview,
-			Popularity:  v.Popularity,
-			PosterPath:  a.cfg.Urls.TMDbImageUrl + v.PosterPath,
-			ReleaseDate: rd,
-			VoteAverage: v.VoteAverage,
-			VoteCount:   v.VoteCount,
+			ID:           v.ID,
+			ContentType:  types.TV,
+			Title:        title,
+			Overview:     v.Overview,
+			Popularity:   v.Popularity,
+			PosterPath:   a.cfg.Urls.TMDbImageUrl + v.PosterPath,
+			BackdropPath: a.cfg.Urls.TMDbImageUrl + v.BackdropPath,
+			ReleaseDate:  rd,
+			VoteAverage:  v.VoteAverage,
+			VoteCount:    v.VoteCount,
 		})
 	}
 
@@ -484,16 +528,17 @@ func (a *TMDbApi) GetMovieRecommendations(ctx context.Context, ids []int64) (typ
 					}
 
 					c = append(c, types.ContentItem{
-						ID:          v.ID,
-						ContentType: types.Movie,
-						Title:       v.Title,
-						Overview:    v.Overview,
-						Popularity:  v.Popularity,
-						PosterPath:  a.cfg.Urls.TMDbImageUrl + v.PosterPath,
-						ReleaseDate: rd,
-						VoteAverage: v.VoteAverage,
-						VoteCount:   v.VoteCount,
-						Genres:      a.getGenresByIDs(v.GenreIDs, types.Movie),
+						ID:           v.ID,
+						ContentType:  types.Movie,
+						Title:        v.Title,
+						Overview:     v.Overview,
+						Popularity:   v.Popularity,
+						PosterPath:   a.cfg.Urls.TMDbImageUrl + v.PosterPath,
+						BackdropPath: a.cfg.Urls.TMDbImageUrl + v.BackdropPath,
+						ReleaseDate:  rd,
+						VoteAverage:  v.VoteAverage,
+						VoteCount:    v.VoteCount,
+						Genres:       a.getGenresByIDs(v.GenreIDs, types.Movie),
 					})
 				}
 
@@ -566,16 +611,17 @@ func (a *TMDbApi) GetTVRecommendations(ctx context.Context, ids []int64) (types.
 					}
 
 					c = append(c, types.ContentItem{
-						ID:          v.ID,
-						ContentType: types.TV,
-						Title:       v.Name,
-						Overview:    v.Overview,
-						Popularity:  v.Popularity,
-						PosterPath:  a.cfg.Urls.TMDbImageUrl + v.PosterPath,
-						ReleaseDate: rd,
-						VoteAverage: v.VoteAverage,
-						VoteCount:   v.VoteCount,
-						Genres:      a.getGenresByIDs(v.GenreIDs, types.Movie),
+						ID:           v.ID,
+						ContentType:  types.TV,
+						Title:        v.Name,
+						Overview:     v.Overview,
+						Popularity:   v.Popularity,
+						PosterPath:   a.cfg.Urls.TMDbImageUrl + v.PosterPath,
+						BackdropPath: a.cfg.Urls.TMDbImageUrl + v.BackdropPath,
+						ReleaseDate:  rd,
+						VoteAverage:  v.VoteAverage,
+						VoteCount:    v.VoteCount,
+						Genres:       a.getGenresByIDs(v.GenreIDs, types.Movie),
 					})
 				}
 
@@ -668,16 +714,23 @@ func (a *TMDbApi) searchMovieByTitle(_ context.Context, titles []string) (types.
 						poster = emptyImageUrl
 					}
 
+					backdrop := a.cfg.Urls.TMDbImageUrl + v.BackdropPath
+					if v.BackdropPath == "" {
+						log.Warn("empty backdrop path", "id", v.ID)
+						backdrop = emptyImageUrl
+					}
+
 					c = append(c, types.ContentItem{
-						ID:          v.ID,
-						ContentType: types.Movie,
-						Title:       v.Title,
-						Overview:    v.Overview,
-						Popularity:  v.Popularity,
-						PosterPath:  poster,
-						ReleaseDate: rd,
-						VoteAverage: v.VoteAverage,
-						VoteCount:   v.VoteCount,
+						ID:           v.ID,
+						ContentType:  types.Movie,
+						Title:        v.Title,
+						Overview:     v.Overview,
+						Popularity:   v.Popularity,
+						PosterPath:   poster,
+						BackdropPath: backdrop,
+						ReleaseDate:  rd,
+						VoteAverage:  v.VoteAverage,
+						VoteCount:    v.VoteCount,
 					})
 				}
 
@@ -744,16 +797,23 @@ func (a *TMDbApi) searchTVByTitle(_ context.Context, titles []string) (types.Con
 						poster = emptyImageUrl
 					}
 
+					backdrop := a.cfg.Urls.TMDbImageUrl + v.BackdropPath
+					if v.BackdropPath == "" {
+						log.Warn("empty backdrop path", "id", v.ID)
+						backdrop = emptyImageUrl
+					}
+
 					c = append(c, types.ContentItem{
-						ID:          v.ID,
-						ContentType: types.TV,
-						Title:       v.Name,
-						Overview:    v.Overview,
-						Popularity:  v.Popularity,
-						PosterPath:  poster,
-						ReleaseDate: rd,
-						VoteAverage: v.VoteAverage,
-						VoteCount:   v.VoteCount,
+						ID:           v.ID,
+						ContentType:  types.TV,
+						Title:        v.Name,
+						Overview:     v.Overview,
+						Popularity:   v.Popularity,
+						PosterPath:   poster,
+						BackdropPath: backdrop,
+						ReleaseDate:  rd,
+						VoteAverage:  v.VoteAverage,
+						VoteCount:    v.VoteCount,
 					})
 				}
 
@@ -835,16 +895,23 @@ func (a *TMDbApi) GetMoviesByGenre(ctx context.Context, genreIDs []int, page int
 			poster = emptyImageUrl
 		}
 
+		backdrop := a.cfg.Urls.TMDbImageUrl + v.BackdropPath
+		if v.BackdropPath == "" {
+			log.Warn("empty backdrop path", "id", v.ID)
+			backdrop = emptyImageUrl
+		}
+
 		res = append(res, types.ContentItem{
-			ID:          v.ID,
-			ContentType: types.Movie,
-			Title:       v.Title,
-			Overview:    v.Overview,
-			Popularity:  v.Popularity,
-			PosterPath:  poster,
-			ReleaseDate: rd,
-			VoteAverage: v.VoteAverage,
-			VoteCount:   v.VoteCount,
+			ID:           v.ID,
+			ContentType:  types.Movie,
+			Title:        v.Title,
+			Overview:     v.Overview,
+			Popularity:   v.Popularity,
+			PosterPath:   poster,
+			BackdropPath: backdrop,
+			ReleaseDate:  rd,
+			VoteAverage:  v.VoteAverage,
+			VoteCount:    v.VoteCount,
 		})
 	}
 
@@ -880,16 +947,23 @@ func (a *TMDbApi) GetTVsByGenre(ctx context.Context, genreIDs []int, page int) (
 			poster = emptyImageUrl
 		}
 
+		backdrop := a.cfg.Urls.TMDbImageUrl + v.BackdropPath
+		if v.BackdropPath == "" {
+			log.Warn("empty backdrop path", "id", v.ID)
+			backdrop = emptyImageUrl
+		}
+
 		res = append(res, types.ContentItem{
-			ID:          v.ID,
-			ContentType: types.TV,
-			Title:       v.Name,
-			Overview:    v.Overview,
-			Popularity:  v.Popularity,
-			PosterPath:  poster,
-			ReleaseDate: rd,
-			VoteAverage: v.VoteAverage,
-			VoteCount:   v.VoteCount,
+			ID:           v.ID,
+			ContentType:  types.TV,
+			Title:        v.Name,
+			Overview:     v.Overview,
+			Popularity:   v.Popularity,
+			PosterPath:   poster,
+			BackdropPath: backdrop,
+			ReleaseDate:  rd,
+			VoteAverage:  v.VoteAverage,
+			VoteCount:    v.VoteCount,
 		})
 	}
 

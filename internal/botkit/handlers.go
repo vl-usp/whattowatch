@@ -61,14 +61,16 @@ func (t *TGBot) helpHandler(ctx context.Context, b *bot.Bot, update *models.Upda
 }
 
 func (t *TGBot) searchByTitleHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
-	log := t.log.With("fn", "searchByTitleHandler", "user_id", update.Message.From.ID, "chat_id", update.Message.Chat.ID)
+	chatID := update.Message.Chat.ID
+
+	log := t.log.With("fn", "searchByTitleHandler", "user_id", update.Message.From.ID, "chat_id", chatID)
 	log.Debug("handler func start log")
 
 	titlesStr := strings.Trim(update.Message.Text, "/search ")
 	if titlesStr == "" {
 		t.bot.SendMessage(ctx, &bot.SendMessageParams{
-			ChatID: update.Message.Chat.ID,
-			Text:   "Введите название фильма после команды /search. Пример: /search Начало",
+			ChatID: chatID,
+			Text:   "Введите название фильма после команды /search.\nПример: /search Начало",
 		})
 	}
 	titles := make([]string, 0)
@@ -79,20 +81,25 @@ func (t *TGBot) searchByTitleHandler(ctx context.Context, b *bot.Bot, update *mo
 	res, err := t.api.SearchByTitles(ctx, titles)
 	if err != nil {
 		log.Error("failed to get movies", "error", err.Error())
-		t.sendErrorMessage(ctx, update.Message.Chat.ID)
+		t.sendErrorMessage(ctx, chatID)
 		return
 	}
 
 	if len(res) == 0 {
 		t.bot.SendMessage(ctx, &bot.SendMessageParams{
-			ChatID: update.Message.Chat.ID,
+			ChatID: chatID,
 			Text:   "Ничего не найдено",
 		})
 		return
 	}
 
-	sl := t.generateSlider(res, nil)
-	sl.Show(ctx, b, update.Message.Chat.ID)
+	slides := t.generateSlider(res, nil)
+	_, err = slides.Show(ctx, t.bot, chatID)
+	if err != nil {
+		log.Error("failed to show slider", "error", err.Error())
+		t.sendErrorMessage(ctx, chatID)
+		return
+	}
 }
 
 func (t *TGBot) searchByIDHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
@@ -133,7 +140,7 @@ func (t *TGBot) searchByIDHandler(ctx context.Context, b *bot.Bot, update *model
 
 	_, err = b.SendPhoto(ctx, &bot.SendPhotoParams{
 		ChatID:      update.Message.Chat.ID,
-		Photo:       &models.InputFileString{Data: contentItem.PosterPath},
+		Photo:       &models.InputFileString{Data: contentItem.BackdropPath},
 		Caption:     contentItem.GetInfo(),
 		ParseMode:   "Markdown",
 		ReplyMarkup: kb,
@@ -175,7 +182,7 @@ func (t *TGBot) onContentActionEvent(fn modifyUserContentFunc) inline.OnSelect {
 
 		_, err = b.SendPhoto(ctx, &bot.SendPhotoParams{
 			ChatID:      mes.Message.Chat.ID,
-			Photo:       &models.InputFileString{Data: item.PosterPath},
+			Photo:       &models.InputFileString{Data: item.BackdropPath},
 			Caption:     item.GetInfo(),
 			ParseMode:   "Markdown",
 			ReplyMarkup: kb,
@@ -269,7 +276,12 @@ func (t *TGBot) showMovieByGenre(ctx context.Context, chatID int64, userData Use
 		slider.OnCancel("Показать еще", true, t.onContentGenrePageHandler(t.showMovieByGenre, MovieByGenre, genreID)),
 	}
 	slides := t.generateSlider(movies, opts)
-	slides.Show(ctx, t.bot, chatID)
+	_, err = slides.Show(ctx, t.bot, chatID)
+	if err != nil {
+		log.Error("failed to show slider", "error", err.Error())
+		t.sendErrorMessage(ctx, chatID)
+		return
+	}
 }
 
 func (t *TGBot) showTVByGenre(ctx context.Context, chatID int64, userData UserData, genreID int) {
@@ -292,5 +304,10 @@ func (t *TGBot) showTVByGenre(ctx context.Context, chatID int64, userData UserDa
 		slider.OnCancel("Показать еще", true, t.onContentGenrePageHandler(t.showTVByGenre, TVByGenre, genreID)),
 	}
 	slides := t.generateSlider(movies, opts)
-	slides.Show(ctx, t.bot, chatID)
+	_, err = slides.Show(ctx, t.bot, chatID)
+	if err != nil {
+		log.Error("failed to show slider", "error", err.Error())
+		t.sendErrorMessage(ctx, chatID)
+		return
+	}
 }
