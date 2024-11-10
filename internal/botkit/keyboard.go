@@ -15,6 +15,7 @@ func (t *TGBot) getMainKeyboard() *reply.ReplyKeyboard {
 		t.bot,
 		reply.WithPrefix("rk_main"),
 		reply.IsSelective(),
+		reply.ResizableKeyboard(),
 	).
 		Button("Фильмы 🎥", t.bot, bot.MatchTypeExact, t.onKeyboardChangeEvent("Фильмы. Выберите раздел", t.getMoviesKeyboard)).
 		Row().
@@ -28,6 +29,7 @@ func (t *TGBot) getMoviesKeyboard() *reply.ReplyKeyboard {
 		t.bot,
 		reply.WithPrefix("rk_movies"),
 		reply.IsSelective(),
+		reply.ResizableKeyboard(),
 	).
 		Button("Популярные 🎥", t.bot, bot.MatchTypeExact, t.onContentEvent(t.showMoviePopular, MoviePopular)).
 		Button("Лучшие 🎥", t.bot, bot.MatchTypeExact, t.onContentEvent(t.showMovieTop, MovieTop)).
@@ -47,6 +49,7 @@ func (t *TGBot) getTVsKeyboard() *reply.ReplyKeyboard {
 		t.bot,
 		reply.WithPrefix("rk_tvs"),
 		reply.IsSelective(),
+		reply.ResizableKeyboard(),
 	).
 		Button("Популярные 📺", t.bot, bot.MatchTypeExact, t.onContentEvent(t.showTVPopular, TVPopular)).
 		Button("Лучшие 📺", t.bot, bot.MatchTypeExact, t.onContentEvent(t.showTVTop, TVTop)).
