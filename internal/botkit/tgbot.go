@@ -17,19 +17,15 @@ import (
 type (
 	MovieProvider interface {
 		GetMovie(ctx context.Context, id int) (types.ContentItem, error)
-		GetMovies(ctx context.Context, ids []int64) (types.Content, error)
 		GetMoviePopular(ctx context.Context, page int) (types.Content, error)
 		GetMovieTop(ctx context.Context, page int) (types.Content, error)
-		GetMovieRecommendations(ctx context.Context, ids []int64) (types.Content, error)
 		GetMoviesByGenre(ctx context.Context, genreIDs []int, page int) (types.Content, error)
 	}
 
 	TVProvider interface {
 		GetTV(ctx context.Context, id int) (types.ContentItem, error)
-		GetTVs(ctx context.Context, ids []int64) (types.Content, error)
 		GetTVPopular(ctx context.Context, page int) (types.Content, error)
 		GetTVTop(ctx context.Context, page int) (types.Content, error)
-		GetTVRecommendations(ctx context.Context, ids []int64) (types.Content, error)
 		GetTVsByGenre(ctx context.Context, genreIDs []int, page int) (types.Content, error)
 	}
 
@@ -42,6 +38,8 @@ type (
 		TVProvider
 		GenreProvider
 
+		GetContent(ctx context.Context, contentType types.ContentType, ids []int64) (types.Content, error)
+		GetRecommendations(ctx context.Context, contentType types.ContentType, ids []int64) (types.Content, error)
 		SearchByTitles(ctx context.Context, titles []string) (types.Content, error)
 	}
 

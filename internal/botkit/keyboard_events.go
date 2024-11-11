@@ -13,7 +13,7 @@ import (
 
 type showContentDataFunc func(ctx context.Context, chatID int64, userData UserData)
 type getUserContentIDsFunc func(ctx context.Context, userID int64, contentType types.ContentType) ([]int64, error)
-type getContentByIDsFunc func(ctx context.Context, ids []int64) (types.Content, error)
+type getContentByIDsFunc func(ctx context.Context, contentType types.ContentType, ids []int64) (types.Content, error)
 
 func (t *TGBot) handlerReplyKeyboard(ctx context.Context, b *bot.Bot, update *models.Update) {
 	t.mu.RLock()
@@ -135,7 +135,7 @@ func (t *TGBot) onUserContentEvent(userContentFn getUserContentIDsFunc, getConte
 			return
 		}
 
-		content, err := getContentFn(ctx, userContentIDs)
+		content, err := getContentFn(ctx, contentType, userContentIDs)
 		if err != nil {
 			log.Error("failed to get content", "error", err.Error())
 			t.sendErrorMessage(ctx, chatID)
@@ -174,7 +174,7 @@ func (t *TGBot) onRecommendationsEvent(getContentFn getContentByIDsFunc, content
 			return
 		}
 
-		recomendations, err := getContentFn(ctx, favoriteIDs)
+		recomendations, err := getContentFn(ctx, contentType, favoriteIDs)
 		if err != nil {
 			log.Error("failed to get recommendations", "error", err.Error())
 			t.sendErrorMessage(ctx, chatID)

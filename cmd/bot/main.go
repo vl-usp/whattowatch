@@ -3,7 +3,7 @@ package main
 import (
 	"log/slog"
 	"os"
-	"whattowatch/internal/api"
+	"whattowatch/internal/api/tmdb"
 	"whattowatch/internal/botkit"
 	"whattowatch/internal/config"
 	"whattowatch/internal/storage/postgresql"
@@ -30,7 +30,7 @@ func main() {
 		panic("storage create error: " + err.Error())
 	}
 
-	api, err := api.New(cfg, log)
+	api, err := tmdb.New(cfg, log)
 	if err != nil {
 		log.Error("API create error", "error", err.Error())
 		panic("API create error: " + err.Error())

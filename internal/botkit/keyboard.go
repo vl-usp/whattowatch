@@ -35,9 +35,9 @@ func (t *TGBot) getMoviesKeyboard() *reply.ReplyKeyboard {
 		Button("Лучшие 🎥", t.bot, bot.MatchTypeExact, t.onContentEvent(t.showMovieTop, MovieTop)).
 		Button("Жанры 🎥", t.bot, bot.MatchTypePrefix, t.onGetGenresEvent(types.Movie)).
 		Row().
-		Button("Рекомендации 🎥", t.bot, bot.MatchTypeExact, t.onRecommendationsEvent(t.api.GetMovieRecommendations, types.Movie)).
-		Button("Избранные 🎥", t.bot, bot.MatchTypeExact, t.onUserContentEvent(t.storer.GetFavoriteContentIDs, t.api.GetMovies, types.Movie, "У вас нет избранных фильмов")).
-		Button("Просмотренные 🎥", t.bot, bot.MatchTypeExact, t.onUserContentEvent(t.storer.GetViewedContentIDs, t.api.GetMovies, types.Movie, "У вас нет просмотренных фильмов")).
+		Button("Рекомендации 🎥", t.bot, bot.MatchTypeExact, t.onRecommendationsEvent(t.api.GetRecommendations, types.Movie)).
+		Button("Избранные 🎥", t.bot, bot.MatchTypeExact, t.onUserContentEvent(t.storer.GetFavoriteContentIDs, t.api.GetContent, types.Movie, "У вас нет избранных фильмов")).
+		Button("Просмотренные 🎥", t.bot, bot.MatchTypeExact, t.onUserContentEvent(t.storer.GetViewedContentIDs, t.api.GetContent, types.Movie, "У вас нет просмотренных фильмов")).
 		Row().
 		Button("🔙 Назад", t.bot, bot.MatchTypePrefix, t.onKeyboardChangeEvent("Выберите тип контента", t.getMainKeyboard))
 
@@ -55,9 +55,9 @@ func (t *TGBot) getTVsKeyboard() *reply.ReplyKeyboard {
 		Button("Лучшие 📺", t.bot, bot.MatchTypeExact, t.onContentEvent(t.showTVTop, TVTop)).
 		Button("Жанры 📺", t.bot, bot.MatchTypePrefix, t.onGetGenresEvent(types.TV)).
 		Row().
-		Button("Рекомендации 📺", t.bot, bot.MatchTypeExact, t.onRecommendationsEvent(t.api.GetTVRecommendations, types.TV)).
-		Button("Избранные 📺", t.bot, bot.MatchTypeExact, t.onUserContentEvent(t.storer.GetFavoriteContentIDs, t.api.GetTVs, types.TV, "У вас нет избранных сериалов")).
-		Button("Просмотренные 📺", t.bot, bot.MatchTypeExact, t.onUserContentEvent(t.storer.GetViewedContentIDs, t.api.GetTVs, types.TV, "У вас нет просмотренных сериалов")).
+		Button("Рекомендации 📺", t.bot, bot.MatchTypeExact, t.onRecommendationsEvent(t.api.GetRecommendations, types.TV)).
+		Button("Избранные 📺", t.bot, bot.MatchTypeExact, t.onUserContentEvent(t.storer.GetFavoriteContentIDs, t.api.GetContent, types.TV, "У вас нет избранных сериалов")).
+		Button("Просмотренные 📺", t.bot, bot.MatchTypeExact, t.onUserContentEvent(t.storer.GetViewedContentIDs, t.api.GetContent, types.TV, "У вас нет просмотренных сериалов")).
 		Row().
 		Button("🔙 Назад", t.bot, bot.MatchTypePrefix, t.onKeyboardChangeEvent("Выберите тип контента", t.getMainKeyboard))
 

@@ -2,10 +2,10 @@ package types
 
 import (
 	"bytes"
-	"database/sql"
 	"encoding/gob"
 	"fmt"
 	"strings"
+	"time"
 )
 
 type ContentItem struct {
@@ -16,7 +16,7 @@ type ContentItem struct {
 	Popularity   float32
 	PosterPath   string
 	BackdropPath string
-	ReleaseDate  sql.NullTime
+	ReleaseDate  time.Time
 	VoteAverage  float32
 	VoteCount    int64
 	Genres       Genres
@@ -51,7 +51,7 @@ func UnserializeContentItem(data []byte) (ContentItem, error) {
 func (c ContentItem) GetInfo() string {
 	sb := strings.Builder{}
 
-	sb.WriteString(fmt.Sprintf("*Название:* %s (%d год", c.Title, c.ReleaseDate.Time.Year()))
+	sb.WriteString(fmt.Sprintf("*Название:* %s (%d год", c.Title, c.ReleaseDate.Year()))
 	if len(c.Counties) > 0 {
 		sb.WriteString(fmt.Sprintf("; %s)\n", strings.Join(c.Counties, ", ")))
 	} else {
@@ -75,7 +75,7 @@ func (c ContentItem) GetShortInfo() string {
 	sb := strings.Builder{}
 
 	sb.WriteString(fmt.Sprintf("/%s%d\n", c.ContentType.Sign(), c.ID))
-	sb.WriteString(fmt.Sprintf("*Название:* %s (%d год", c.Title, c.ReleaseDate.Time.Year()))
+	sb.WriteString(fmt.Sprintf("*Название:* %s (%d год", c.Title, c.ReleaseDate.Year()))
 	if len(c.Counties) > 0 {
 		sb.WriteString(fmt.Sprintf("; %s)\n", strings.Join(c.Counties, ", ")))
 	} else {
