@@ -145,7 +145,7 @@ func (t *TGBot) generateSlider(content types.Content, opts []slider.Option) *sli
 	log := t.log.With("fn", "generateSlider")
 	log.Debug("generating slides", "count", len(content))
 
-	limit := 50
+	limit := 100
 	if len(content) > limit {
 		log.Info("too many slides.", "limit", limit, "count", len(content))
 		content = content[:limit]

@@ -152,10 +152,12 @@ func (a *TMDbApi) GetTVRecommendations(ctx context.Context, ids []int64) (types.
 		}(i, jobCh, tvCh)
 	}
 
-	for _, id := range ids {
-		jobCh <- id
-	}
-	defer close(jobCh)
+	go func() {
+		for _, id := range ids {
+			jobCh <- id
+		}
+		close(jobCh)
+	}()
 
 	result := make(types.Content, 0)
 	for i := 0; i < len(ids); i++ {
@@ -213,10 +215,12 @@ func (a *TMDbApi) searchTVByTitle(_ context.Context, titles []string) (types.Con
 		}(i, jobCh, tvCh)
 	}
 
-	for _, title := range titles {
-		jobCh <- title
-	}
-	defer close(jobCh)
+	go func() {
+		for _, title := range titles {
+			jobCh <- title
+		}
+		close(jobCh)
+	}()
 
 	result := make(types.Content, 0)
 	for i := 0; i < len(titles); i++ {

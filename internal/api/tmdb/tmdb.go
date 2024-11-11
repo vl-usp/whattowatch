@@ -206,7 +206,7 @@ func (a *TMDbApi) initCache() error {
 
 	err := g.Wait()
 
-	a.log.Debug("genres loaded", "movies", a.cache.Genres.Movie, "tv", a.cache.Genres.TV)
+	a.log.Debug("genres loaded", "movies count", len(a.cache.Genres.Movie.GetAll()), "tvs count", len(a.cache.Genres.TV.GetAll()))
 
 	return err
 }

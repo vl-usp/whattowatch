@@ -213,10 +213,12 @@ func (a *TMDbApi) searchMovieByTitle(_ context.Context, titles []string) (types.
 		}(i, jobCh, movieCh)
 	}
 
-	for _, title := range titles {
-		jobCh <- title
-	}
-	defer close(jobCh)
+	go func() {
+		for _, title := range titles {
+			jobCh <- title
+		}
+		close(jobCh)
+	}()
 
 	result := make(types.Content, 0)
 	for i := 0; i < len(titles); i++ {
